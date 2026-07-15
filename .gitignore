@@ -1,0 +1,11 @@
+# O'rnatish vaqtida yaratiladi - ko'chirish shart emas
+db/
+venv/
+frontend/node_modules/
+backend/staticfiles/
+backend/media/
+*.pyc
+__pycache__/
+*.pid
+*.log
+.env

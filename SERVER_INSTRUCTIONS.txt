@@ -1,0 +1,78 @@
+══════════════════════════════════════════════════════
+   CyberControl — Server o'rnatish yo'riqnomasi
+══════════════════════════════════════════════════════
+
+TALAB:
+  - Linux server (Ubuntu 20.04+ yoki Debian 11+)
+  - Kamida 2GB RAM, 20GB disk
+  - Internet ulanishi
+
+QADAMLAR:
+─────────────────────────────────────────────────────
+1. Arxiv faylni serverga yuklang:
+
+     scp cybercontrol_server.zip root@SERVER_IP:/opt/
+
+2. Serverga kiring:
+
+     ssh root@SERVER_IP
+
+3. Faylni oching:
+
+     cd /opt
+     apt install unzip -y
+     unzip cybercontrol_server.zip
+     cd cybercontrol-new
+
+4. O'rnatish skriptini ishga tushiring:
+
+     bash deploy.sh
+
+   Skript avtomatik bajaradi:
+   ✓ Docker o'rnatadi (agar yo'q bo'lsa)
+   ✓ Portni so'raydi (default: 80)
+   ✓ Dasturni build qiladi va ishga tushiradi
+   ✓ Ma'lumotlar bazasini tiklaydi
+   ✓ Firewall portini ochadi
+
+5. Brauzerda oching:
+
+     http://SERVER_IP
+
+─────────────────────────────────────────────────────
+KOD O'ZGARTIRISHLAR (serverda):
+
+  Backend/Bot o'zgarishi:
+    nano backend/apps/bot/bot.py
+    docker compose restart bot
+
+  Frontend o'zgarishi:
+    nano frontend/src/pages/...
+    docker compose build frontend
+    docker compose up -d frontend
+
+  DB migratsiyasi:
+    docker exec cybercontrol-new-backend-1 python manage.py migrate
+
+─────────────────────────────────────────────────────
+FOYDALI BUYRUQLAR:
+
+  Holat:        docker compose ps
+  Loglar:       docker compose logs -f backend
+  Restart:      docker compose restart
+  To'xtatish:   docker compose down
+  Yangi backup: docker exec cybercontrol-new-db-1 \
+                  mysqldump -u cybercon_bot -pqr4n53e5XB96zRUDUKL7 \
+                  cybercon_bot > backup.sql
+
+─────────────────────────────────────────────────────
+XAVFSIZLIK (muhim!):
+
+  1. Admin parolini o'zgartiring:
+     docker exec -it cybercontrol-new-backend-1 \
+       python manage.py changepassword admin
+
+  2. docker-compose.yml da parollarni o'zgartiring:
+     DB_PASSWORD, MYSQL_PASSWORD, SECRET_KEY
+
+══════════════════════════════════════════════════════

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"D:\\\\programma\\\\cybercontrol_server\" -Recurse -Depth 0)",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "PowerShell(docker --version)",
+      "PowerShell(docker compose version)",
+      "PowerShell(Get-Command docker -ErrorAction SilentlyContinue; \\(Get-Command docker\\).Source; where.exe docker 2>$null)",
+      "PowerShell(Write-Host \"Arxivdan chiqarilmoqda...\"; Expand-Archive -Path \"D:\\\\programma\\\\cybercontrol_server\\\\cybercontrol-new\\\\db\\\\mariadb.zip\" -DestinationPath \"D:\\\\programma\\\\cybercontrol_server\\\\cybercontrol-new\\\\db\\\\tmp\" -Force; $folder = Get-ChildItem \"D:\\\\programma\\\\cybercontrol_server\\\\cybercontrol-new\\\\db\\\\tmp\" -Directory | Select-Object -First 1; Move-Item $folder.FullName \"D:\\\\programma\\\\cybercontrol_server\\\\cybercontrol-new\\\\db\\\\mariadb\"; Remove-Item \"D:\\\\programma\\\\cybercontrol_server\\\\cybercontrol-new\\\\db\\\\tmp\" -Recurse -Force; Remove-Item \"D:\\\\programma\\\\cybercontrol_server\\\\cybercontrol-new\\\\db\\\\mariadb.zip\"; Write-Host \"Tayyor\")",
+      "PowerShell($dataDir = \"D:\\\\programma\\\\cybercontrol_server\\\\cybercontrol-new\\\\db\\\\data\"; New-Item -ItemType Directory -Path $dataDir -Force | Out-Null; & \"D:\\\\programma\\\\cybercontrol_server\\\\cybercontrol-new\\\\db\\\\mariadb\\\\bin\\\\mysql_install_db.exe\" --datadir=\"$dataDir\" --password= 2>&1)",
+      "PowerShell($mysqld = \"D:\\\\programma\\\\cybercontrol_server\\\\cybercontrol-new\\\\db\\\\mariadb\\\\bin\\\\mysqld.exe\"; $dataDir = \"D:\\\\programma\\\\cybercontrol_server\\\\cybercontrol-new\\\\db\\\\data\"; Start-Process -FilePath $mysqld -ArgumentList \"--datadir=`\"$dataDir`\"\",\"--port=3308\",\"--bind-address=127.0.0.1\",\"--innodb-buffer-pool-size=64M\",\"--console\" -WindowStyle Hidden; Write-Host \"MariaDB ishga tushirildi, kutilmoqda...\"; Start-Sleep -Seconds 5; $mysqladmin = \"D:\\\\programma\\\\cybercontrol_server\\\\cybercontrol-new\\\\db\\\\mariadb\\\\bin\\\\mysqladmin.exe\"; & $mysqladmin --host=127.0.0.1 --port=3308 -u root --password= ping 2>&1)",
+      "PowerShell(cd \"D:\\\\programma\\\\cybercontrol_server\\\\cybercontrol-new\\\\backend\"; $env:DB_HOST=\"127.0.0.1\"; $env:DB_PORT=\"3308\"; $env:DB_NAME=\"cybercon_bot\"; $env:DB_USER=\"cybercon_bot\"; $env:DB_PASSWORD=\"qr4n53e5XB96zRUDUKL7\"; $env:DEBUG=\"1\"; $env:ALLOWED_HOSTS=\"localhost,127.0.0.1\"; ..\\\\venv\\\\Scripts\\\\python.exe manage.py migrate 2>&1)",
+      "PowerShell(Start-Process powershell -ArgumentList \"-Command\",\"wsl --install --no-distribution; Write-Host 'WSL2 o rnatildi'\" -Verb RunAs -Wait 2>&1)"
+    ]
+  }
+}

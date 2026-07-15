@@ -1,0 +1,82 @@
+services:
+
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: cybercon_bot
+      MYSQL_USER: cybercon_bot
+      MYSQL_PASSWORD: qr4n53e5XB96zRUDUKL7
+      MYSQL_ROOT_PASSWORD: root_secret
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./db/mysql_backup.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "cybercon_bot", "-pqr4n53e5XB96zRUDUKL7"]
+      interval: 10s
+      retries: 10
+      start_period: 30s
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    environment:
+      DB_HOST: db
+      DB_NAME: cybercon_bot
+      DB_USER: cybercon_bot
+      DB_PASSWORD: qr4n53e5XB96zRUDUKL7
+      SECRET_KEY: "cybercontrol-django-secret-2024-change-in-prod"
+      DEBUG: "1"
+      PYTHONUNBUFFERED: "1"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,backend,109.94.172.25"
+      CORS_ORIGINS: "http://109.94.172.25:8080"
+      TELEGRAM_TOKEN: "7799570288:AAG-hM-WseDjMFPFb4QG9VA22YDqNv2eZn8"
+    volumes:
+      - ./backend/apps:/app/apps
+      - ./backend/media:/app/media
+      - arxiv_data:/app/arxiv
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8001:8000"
+
+  bot:
+    build: ./backend
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: python -u -m apps.bot.bot
+    environment:
+      DB_HOST: db
+      DB_NAME: cybercon_bot
+      DB_USER: cybercon_bot
+      DB_PASSWORD: qr4n53e5XB96zRUDUKL7
+      SECRET_KEY: "cybercontrol-django-secret-2024-change-in-prod"
+      DEBUG: "1"
+      PYTHONUNBUFFERED: "1"
+      TELEGRAM_TOKEN: "7799570288:AAG-hM-WseDjMFPFb4QG9VA22YDqNv2eZn8"
+    volumes:
+      - ./backend/apps:/app/apps
+      - ./backend/media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
+  arxiv_data:
