@@ -42,10 +42,10 @@ export default function RespublikaDashboard() {
   if (!data)   return <div className="text-center py-20 text-gray-400">Ma'lumot topilmadi</div>
 
   const statCards = [
-    { label: 'Yangi (tasdiqlanmagan)', value: data.jami_yangi,        color: 'text-amber-600',  bg: 'bg-amber-50' },
-    { label: 'Tasdiqlangan',           value: data.jami_tasdiqlangan, color: 'text-green-600',  bg: 'bg-green-50' },
-    { label: 'Rad etilgan',            value: data.jami_rad_etilgan,  color: 'text-red-600',    bg: 'bg-red-50' },
-    { label: 'Viloyatlar soni',        value: data.viloyatlar.length, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: 'Yangi (tasdiqlanmagan)', value: data.jami_yangi        ?? 0, color: 'text-amber-600',  bg: 'bg-amber-50' },
+    { label: 'Tasdiqlangan',           value: data.jami_tasdiqlangan ?? 0, color: 'text-green-600',  bg: 'bg-green-50' },
+    { label: 'Rad etilgan',            value: data.jami_rad_etilgan  ?? 0, color: 'text-red-600',    bg: 'bg-red-50' },
+    { label: 'Viloyatlar soni',        value: (data.viloyatlar || []).length, color: 'text-indigo-600', bg: 'bg-indigo-50' },
   ]
 
   // Disk to'lganlik foizi (3GB limit)
@@ -93,7 +93,7 @@ export default function RespublikaDashboard() {
                   { label: 'Ishlatilgan', val: `${diskData.hajm_mb} MB`, color: 'text-gray-800' },
                   { label: 'Limit',       val: `${LIMIT_GB} GB`,        color: 'text-gray-400' },
                   { label: 'Bo\'sh',      val: `${Math.max(0, (LIMIT_GB * 1024) - diskData.hajm_mb).toFixed(0)} MB`, color: 'text-emerald-600' },
-                  { label: 'Rasmlar',     val: diskData.rasm_soni.toLocaleString(), color: 'text-indigo-600' },
+                  { label: 'Rasmlar',     val: (diskData.rasm_soni ?? 0).toLocaleString(), color: 'text-indigo-600' },
                 ].map(s => (
                   <div key={s.label} className="bg-gray-50 rounded-lg p-2">
                     <div className={`text-base font-bold ${s.color}`}>{s.val}</div>
