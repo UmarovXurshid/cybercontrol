@@ -18,3 +18,4 @@ node_modules/
 # Django
 backend/staticfiles/
 backend/media/
+tools/
