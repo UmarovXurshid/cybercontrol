@@ -39,15 +39,15 @@ class Mahalla(models.Model):
 # ── TargibotUtkazilganJoy ─────────────────────────────────────────────────────
 class TargibotUtkazilganJoy(models.Model):
     KATEGORIYA = [
-        (1,"Ta'lim muassasalari"),
-        (2,'Kasalxona va poliklinika'),
-        (3,'Bozorlar va yirik savdo majmualari'),
-        (4,"Istirohat bog'lari va ko'ngil ochur joylar"),
-        (5,'Jamoat transportlari'),
-        (6,'Masjidar'),
-        (7,'HMQO'),
-        (8,'Boshqa idora va tashkilotlar'),
-        (9,'Aholi gavjum joylarda'),
+        (1,'Таълим муассасалари'),
+        (2,'Касалхона ва поликлиника'),
+        (3,'Бозорлар ва йирик савдо мажмуалари'),
+        (4,'Истироҳат боғлари ва кунгил очар жойлар'),
+        (5,'Жамоат транспортлари'),
+        (6,'Масжидлар'),
+        (7,'ҲМҚО'),
+        (8,'Бошқа идора ва ташкилотлар'),
+        (9,'Аҳоли гавжум жойларда'),
     ]
     targibot_utkazilgan_joy = models.CharField(max_length=255)
     joy_turi                = models.IntegerField(default=1)
