@@ -1291,8 +1291,8 @@ def hisobot_excel_xavfsiz_yurt(request):
 
     # Qator 3: kategoriyalar
     col = 2
-    for nom in ['JAMI', 'Mahallalar', "Oliy ta'lim", 'Akad. litsey',
-                "O'rta ta'lim", 'Maktabgacha', 'Kasalxona', 'Bozorlar', 'HMQO', 'Boshqa']:
+    for nom in ['JAMI', "Ta'lim", 'Kasalxona', 'Bozorlar',
+                'Istirohat', 'Transport', 'Masjid', 'HMQO', 'Boshqa', 'Gavjum']:
         hdr(ws, 3, col, nom, LT_BLU if col == 2 else LT_GRN, color='000000', colspan=2)
         col += 2
 
@@ -2447,11 +2447,7 @@ def kunlik_ishlar_get(request):
     )
     bot_data = _bot_agg(viloyat_id, sana)
 
-    # Har bir kategoriya uchun joy nomini (birinchisini) jo'natamiz
-    kat_nomlar = {}
-    for k in range(1, 14):
-        joy = TargibotUtkazilganJoy.objects.filter(kategoriya=k).first()
-        kat_nomlar[f'kat{k}'] = joy.targibot_utkazilgan_joy if joy else f'Kategoriya {k}'
+    kat_nomlar = {f'kat{k}': v for k, v in TargibotUtkazilganJoy.KATEGORIYA}
 
     return Response({
         'record'    : KunlikIshlarSerializer(record).data,

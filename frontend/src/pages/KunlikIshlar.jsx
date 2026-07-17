@@ -549,7 +549,7 @@ export default function KunlikIshlar() {
             <>
             {/* ══════ 1-BO'LIM: UCHRASHUVLAR ══════ */}
             <Section title="1. O'tkazilgan uchrashuvlar soni (bot ma'lumotlari)" color="blue">
-              {[1,2,3,4,5,6,7,8,9,10,11,12].map(k => (
+              {[1,2,3,4,5,6,7,8,9].map(k => (
                 <BotRow key={k}
                   label={katNomlar[`kat${k}`] || `Kategoriya ${k}`}
                   val={bot[`kat${k}`] || 0} />

@@ -164,7 +164,7 @@ def db_submit(hisobot, msg_id):
 
 @sync_to_async
 def db_get_joylar(joy_turi):
-    return list(TargibotUtkazilganJoy.objects.filter(joy_turi=joy_turi))
+    return list(TargibotUtkazilganJoy.objects.all().order_by('kategoriya'))
 
 @sync_to_async
 def db_count_photos(hisobot):
