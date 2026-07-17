@@ -116,7 +116,7 @@ def respublika_dashboard(request):
     viloyatlar = Viloyat.objects.all()
     result = []
     for v in viloyatlar:
-        qs = Hisobot.objects.filter(mahalla__tuman__viloyat_id=v.id)
+        qs = Hisobot.objects.filter(mahalla__tuman__viloyat_id=v.id, mahalla__is_viloyat=True)
         admin = User.objects.filter(viloyat_id=v.id, role='viloyat').first()
         result.append({
             'id':                v.id,
@@ -128,10 +128,11 @@ def respublika_dashboard(request):
             'bugun_tasdiqlangan':qs.filter(status=2, qushilgan_vaqt__date=today).count(),
             'admin_username':    admin.username if admin else None,
         })
+    resp_qs = Hisobot.objects.filter(mahalla__is_viloyat=True)
     return Response({
-        'jami_yangi':        Hisobot.objects.filter(status=1).count(),
-        'jami_tasdiqlangan': Hisobot.objects.filter(status=2).count(),
-        'jami_rad_etilgan':  Hisobot.objects.filter(status=3).count(),
+        'jami_yangi':        resp_qs.filter(status=1).count(),
+        'jami_tasdiqlangan': resp_qs.filter(status=2).count(),
+        'jami_rad_etilgan':  resp_qs.filter(status=3).count(),
         'viloyatlar':        result,
     })
 

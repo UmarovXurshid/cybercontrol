@@ -50,6 +50,11 @@ def db_get_by_phone(phone):
     if xodim and xodim.tashkilot.mahalla:
         return None, xodim.tashkilot.mahalla, xodim
     if xodim and not xodim.tashkilot.mahalla:
+        # Tuman hodimi: tashkilot tumanidagi is_tuman=True mahallani qidirish
+        if xodim.tashkilot.tuman_id:
+            m_tuman = Mahalla.objects.filter(tuman_id=xodim.tashkilot.tuman_id, is_tuman=True).first()
+            if m_tuman:
+                return None, m_tuman, xodim
         return None, None, xodim  # tashkilot mahallasi belgilanmagan
     m = Mahalla.objects.filter(inspektor_tel=phone).first() or \
         Mahalla.objects.filter(inspektor_tel='+'+phone).first()
@@ -65,6 +70,11 @@ def db_get_by_tg(tg_id):
     xodim = HamkorXodim.objects.filter(tg_id=tg_id, is_active=True).select_related('tashkilot__mahalla__tuman', 'tashkilot').first()
     if xodim and xodim.tashkilot.mahalla:
         return None, xodim.tashkilot.mahalla, xodim
+    if xodim and not xodim.tashkilot.mahalla:
+        if xodim.tashkilot.tuman_id:
+            m_tuman = Mahalla.objects.filter(tuman_id=xodim.tashkilot.tuman_id, is_tuman=True).first()
+            if m_tuman:
+                return None, m_tuman, xodim
     m = Mahalla.objects.filter(tg_id=tg_id).first()
     return None, m, None
 
