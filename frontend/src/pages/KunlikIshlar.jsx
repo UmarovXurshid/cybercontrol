@@ -456,7 +456,7 @@ export default function KunlikIshlar() {
     load()
   }
 
-  const jami_uchrashuv = [1,2,3,4,5,6,7,8,9,10,11,12]
+  const jami_uchrashuv = bot.jami || [1,2,3,4,5,6,7,8,9,10]
     .reduce((s, k) => s + (bot[`kat${k}`] || 0), 0)
 
   const canEdit = loaded && !isLocked && (isViloyat || (isRespublika && !!selViloyat))
