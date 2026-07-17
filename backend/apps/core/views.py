@@ -2391,7 +2391,7 @@ def _bot_agg(viloyat_id, sana_str):
 
     # kategoriya bo'yicha hisobotlar soni (bir kunda)
     kat_ids = {k: list(TargibotUtkazilganJoy.objects.filter(kategoriya=k).values_list('id', flat=True))
-               for k in range(1, 14)}
+               for k in range(1, 11)}
 
     def c(k):
         return qs.filter(targibot_utgan_joy__in=kat_ids.get(k, [])).count()
@@ -2405,20 +2405,17 @@ def _bot_agg(viloyat_id, sana_str):
     )
 
     return {
-        'kat1'     : c(1),   # Qizil MFYlar / Mahallalar
-        'kat2'     : c(2),   # Oliy ta'lim
-        'kat3'     : c(3),   # Akademik litseylar
-        'kat4'     : c(4),   # O'rta ta'lim (maktab)
-        'kat5'     : c(5),   # Maktabgacha
-        'kat6'     : c(6),   # Kasalxona va poliklinika
-        'kat7'     : c(7),   # Bozorlar va savdo majmualari
-        'kat8'     : c(8),   # HMQO
-        'kat9'     : c(9),   # Boshqa
-        'kat10'    : c(10),  # Istirohat bog'lari
-        'kat11'    : c(11),  # Jamoat transportlari
-        'kat12'    : c(12),  # Masjidar
-        'kat13'    : c(13),  # Probatsiya ro'yxatidagi shaxslar
-        'jami'     : sum(c(k) for k in range(1, 14)),
+        'kat1'     : c(1),   # Қизил МФЙлар
+        'kat2'     : c(2),   # Таълим муассасалари
+        'kat3'     : c(3),   # Касалхона ва поликлиника
+        'kat4'     : c(4),   # Бозорлар ва йирик савдо мажмуалари
+        'kat5'     : c(5),   # Истироҳат боғлари
+        'kat6'     : c(6),   # Жамоат транспортлари
+        'kat7'     : c(7),   # Масжидлар
+        'kat8'     : c(8),   # ҲМҚО
+        'kat9'     : c(9),   # Бошқа идора ва ташкилотлар
+        'kat10'    : c(10),  # Аҳоли гавжум жойларда
+        'jami'     : sum(c(k) for k in range(1, 11)),
         'fuk_jami' : int(agg['fuk_jami'] or 0),
         'off18g'  : int(agg['off18g'] or 0),
         'off18k'  : int(agg['off18k'] or 0),
