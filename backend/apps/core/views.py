@@ -2391,7 +2391,7 @@ def _bot_agg(viloyat_id, sana_str):
 
     # kategoriya bo'yicha hisobotlar soni (bir kunda)
     kat_ids = {k: list(TargibotUtkazilganJoy.objects.filter(kategoriya=k).values_list('id', flat=True))
-               for k in range(1, 11)}
+               for k in range(1, 12)}
 
     def c(k):
         return qs.filter(targibot_utgan_joy__in=kat_ids.get(k, [])).count()
@@ -2415,6 +2415,7 @@ def _bot_agg(viloyat_id, sana_str):
         'kat8'     : c(8),   # ҲМҚО
         'kat9'     : c(9),   # Бошқа идора ва ташкилотлар
         'kat10'    : c(10),  # Аҳоли гавжум жойларда
+        'kat11'    : c(11),  # Probatsiya ro'yxatidagi shaxslar
         'jami'     : qs.count(),
         'fuk_jami' : int(agg['fuk_jami'] or 0),
         'off18g'  : int(agg['off18g'] or 0),

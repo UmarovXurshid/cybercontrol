@@ -643,8 +643,8 @@ export default function KunlikIshlar() {
             {/* ══════ 5-BO'LIM: PROBATSIYA ══════ */}
             <Section title="5. Probatsiya ro'yxatidagi shaxslar bilan suhbatlar" color="purple">
               <BotRow
-                label={katNomlar['kat13'] || "Probatsiya ro'yxatidagi shaxslar"}
-                val={bot.kat13 || 0} />
+                label={katNomlar['kat11'] || "Probatsiya ro'yxatidagi shaxslar"}
+                val={bot.kat11 || 0} />
               <div className="px-3 py-2 text-xs text-gray-400">
                 🤖 Bu ma'lumot bot orqali to'ldiriladi. O'zgartirish mumkin emas.
               </div>

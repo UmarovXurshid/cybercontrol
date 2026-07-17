@@ -49,6 +49,7 @@ class TargibotUtkazilganJoy(models.Model):
         (8,'ҲМҚО'),
         (9,'Бошқа идора ва ташкилотлар'),
         (10,'Аҳоли гавжум жойларда'),
+        (11,"Probatsiya ro'yxatidagi shaxslar"),
     ]
     targibot_utkazilgan_joy = models.CharField(max_length=255)
     joy_turi                = models.IntegerField(default=1)
