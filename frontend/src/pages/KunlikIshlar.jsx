@@ -516,6 +516,10 @@ export default function KunlikIshlar() {
           </button>
         )}
 
+        {isViloyat && (
+          <ExcelExport sana={sana} />
+        )}
+
         {record?.status === 4 && record.rad_sababi && (
           <div className="w-full mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
             ❌ <b>Rad sababi:</b> {record.rad_sababi}

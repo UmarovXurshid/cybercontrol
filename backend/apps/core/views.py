@@ -1667,7 +1667,7 @@ def xavfsiz_yurt_template_excel(request):  # noqa: C901
 
 # ── Kunlik ishlar Excel export ────────────────────────────────────────────────
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsRespublika])
+@permission_classes([IsAuthenticated, IsViloyatOrAbove])
 def kunlik_ishlar_excel(request):  # noqa: C901
     """
     GET /api/kunlik-ishlar/excel/?start=YYYY-MM-DD&end=YYYY-MM-DD
@@ -1683,6 +1683,12 @@ def kunlik_ishlar_excel(request):  # noqa: C901
     start_str = request.GET.get('start', date.today().isoformat())
     end_str   = request.GET.get('end',   date.today().isoformat())
     period    = f"{start_str} — {end_str}" if start_str != end_str else start_str
+
+    role = request.user.role
+    viloyat_filter = ''
+    sql_params = [start_str, end_str]
+    if role == 'viloyat' and request.user.viloyat_id:
+        viloyat_filter = f'AND v.id = {int(request.user.viloyat_id)}'
 
     # ── Bot SQL ───────────────────────────────────────────────────────────────
     sql = """
@@ -1711,6 +1717,7 @@ def kunlik_ishlar_excel(request):  # noqa: C901
         LEFT JOIN hisobot h ON h.mahalla_id=m.id AND h.status=2
                            AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s
         LEFT JOIN targibot_utkazilgan_joy j ON j.id=h.targibot_utgan_joy
+        WHERE 1=1 """ + viloyat_filter + """
         GROUP BY v.id ORDER BY v.id
     """
     with connection.cursor() as cur:
