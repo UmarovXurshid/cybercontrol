@@ -260,6 +260,7 @@ class KunlikIshlar(models.Model):
     iio_xizmat_soni         = models.IntegerField(default=0)
     hamkor_tashkilot_soni   = models.IntegerField(default=0)
     sayber_soni             = models.IntegerField(default=0)
+    probatsiya_soni         = models.IntegerField(default=0)
 
     yaratilgan  = models.DateTimeField(auto_now_add=True)
     yangilangan = models.DateTimeField(auto_now=True)
@@ -334,6 +335,7 @@ class ViloyatInfratuzilma(models.Model):
     istirohat       = models.IntegerField(default=0)   # kat 10
     jamoat_transport= models.IntegerField(default=0)   # kat 11
     masjid          = models.IntegerField(default=0)   # kat 12
+    probatsiya      = models.IntegerField(default=0)   # probatsiya hisobida turuvchilar
     yangilangan     = models.DateTimeField(auto_now=True)
 
     class Meta:

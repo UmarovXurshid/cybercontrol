@@ -298,6 +298,7 @@ const INFRA_FIELDS = [
   { field: 'istirohat',        label: "Istirohat bog'lari" },
   { field: 'jamoat_transport', label: "Jamoat transporti" },
   { field: 'masjid',           label: "Masjidar" },
+  { field: 'probatsiya',       label: "Probatsiya hisobida turuvchilar soni" },
 ]
 
 const INFRA_EMPTY = Object.fromEntries(INFRA_FIELDS.map(f => [f.field, 0]))
