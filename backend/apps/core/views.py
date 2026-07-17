@@ -221,9 +221,9 @@ def tasdiqlash(request):
     role = request.user.role
     base_qs = Hisobot.objects.filter(id__in=tasdiqlangan + rad)
     if role == 'viloyat':
-        allowed = base_qs.filter(**vf).values_list('id', flat=True)
+        allowed = base_qs.filter(**vf, mahalla__is_viloyat=False).values_list('id', flat=True)
     elif role == 'respublika':
-        allowed = base_qs.values_list('id', flat=True)
+        allowed = base_qs.filter(mahalla__is_viloyat=True).values_list('id', flat=True)
     else:
         allowed = []
     allowed = set(allowed)
