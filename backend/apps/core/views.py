@@ -2415,7 +2415,7 @@ def _bot_agg(viloyat_id, sana_str):
         'kat8'     : c(8),   # ҲМҚО
         'kat9'     : c(9),   # Бошқа идора ва ташкилотлар
         'kat10'    : c(10),  # Аҳоли гавжум жойларда
-        'jami'     : sum(c(k) for k in range(1, 11)),
+        'jami'     : qs.count(),
         'fuk_jami' : int(agg['fuk_jami'] or 0),
         'off18g'  : int(agg['off18g'] or 0),
         'off18k'  : int(agg['off18k'] or 0),
