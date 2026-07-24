@@ -121,14 +121,15 @@ def db_set_count(hisobot, soni, msg_id):
 
 @sync_to_async
 def db_set_yosh(hisobot, gacha, katta):
+    hisobot.qatnashchilar_soni = gacha + katta
     if hisobot.targibot_turi == 1:
         hisobot.offline_18_gacha = gacha
         hisobot.offline_18_katta = katta
-        hisobot.save(update_fields=['offline_18_gacha', 'offline_18_katta'])
+        hisobot.save(update_fields=['offline_18_gacha', 'offline_18_katta', 'qatnashchilar_soni'])
     else:
         hisobot.online_18_gacha = gacha
         hisobot.online_18_katta = katta
-        hisobot.save(update_fields=['online_18_gacha', 'online_18_katta'])
+        hisobot.save(update_fields=['online_18_gacha', 'online_18_katta', 'qatnashchilar_soni'])
 
 @sync_to_async
 def db_set_materials(hisobot, video, banner, flayer, buklet, boshqa):
@@ -153,11 +154,11 @@ def db_set_location(hisobot, lat, lng):
 
 @sync_to_async
 def db_submit(hisobot, msg_id):
-    # Probatsiya (kat=13) hisobotlari avtomatik tasdiqlangan bo'ladi
-    joy_ids_kat13 = list(
-        TargibotUtkazilganJoy.objects.filter(kategoriya=13).values_list('id', flat=True)
+    # Probatsiya (kat=11) hisobotlari avtomatik tasdiqlangan bo'ladi
+    joy_ids_kat11 = list(
+        TargibotUtkazilganJoy.objects.filter(kategoriya=11).values_list('id', flat=True)
     )
-    is_probatsiya = hisobot.targibot_utgan_joy in joy_ids_kat13
+    is_probatsiya = hisobot.targibot_utgan_joy in joy_ids_kat11
     hisobot.status     = 2 if is_probatsiya else 1
     hisobot.message_id = msg_id
     hisobot.save(update_fields=['status', 'message_id'])
@@ -335,13 +336,25 @@ async def callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
         joy_id = int(data.split('_')[1])
         await db_set_joy(h, joy_id)
-        ctx.user_data['step'] = STEP_COUNT
+        ctx.user_data['step'] = STEP_AGE1
         joylar   = await db_get_joylar(h.targibot_turi or 1)
         joy_nomi = next((j.targibot_utkazilgan_joy for j in joylar if j.id == joy_id), '')
         await q.edit_message_text(f"✅ Joy: <b>{joy_nomi}</b>", parse_mode='HTML')
-        label = ("👥 Necha kishiga targ'ibot qilindi?" if h.targibot_turi == 1
-                 else "👥 Guruh/kanal foydalanuvchilar soni?")
-        await q.message.chat.send_message(label + "\n\n<i>Faqat raqam yuboring.</i>", parse_mode='HTML')
+        if h.targibot_turi == 1:
+            await q.message.chat.send_message(
+                "👶 <b>18 yoshgacha</b> bo'lgan qatnashchilar soni:\n\n"
+                "<i>Targ'ibot ishtirokchilari orasida 18 yoshga to'lmaganlar nechta?</i>\n"
+                "<i>(Yo'q bo'lsa 0 yozing)</i>",
+                parse_mode='HTML'
+            )
+        else:
+            await q.message.chat.send_message(
+                "👶 <b>18 yoshgacha</b> bo'lgan obunachlar soni:\n\n"
+                "<i>Siz targ'ibot qilayotgan kanal yoki guruhdagi 18 yoshga to'lmagan\n"
+                "obunachlar taxminan nechta?</i>\n"
+                "<i>(Yo'q bo'lsa 0 yozing)</i>",
+                parse_mode='HTML'
+            )
 
     await q.answer()
 
@@ -494,33 +507,16 @@ async def text_msg(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ /start bosib qaytadan boshlang.")
             return
         await db_set_count(h, int(msg), update.message.message_id)
-        # OAV uchun alohida yo'l (yosh va lokatsiya so'ralmaydi)
-        if h.targibot_turi and h.targibot_turi >= 3:
-            ctx.user_data['step'] = STEP_OAV_PROOF
-            nom = OAV_NOMLAR.get(h.targibot_turi, 'OAV')
-            await update.message.reply_text(
-                f"✅ {nom} soni: <b>{msg}</b>\n\n"
-                f"🔗 Havola (URL) yuboring\n"
-                f"<i>yoki screenshot/foto yuboring.</i>",
-                parse_mode='HTML'
-            )
-            return
-        ctx.user_data['step'] = STEP_AGE1
-        if h.targibot_turi == 1:
-            await update.message.reply_text(
-                "👶 <b>18 yoshgacha</b> bo'lgan qatnashchilar soni:\n\n"
-                "<i>Targ'ibot ishtirokchilari orasida 18 yoshga to'lmaganlar nechta?</i>\n"
-                "<i>(Yo'q bo'lsa 0 yozing)</i>",
-                parse_mode='HTML'
-            )
-        else:
-            await update.message.reply_text(
-                "👶 <b>18 yoshgacha</b> bo'lgan obunachlar soni:\n\n"
-                "<i>Siz targ'ibot qilayotgan kanal yoki guruhdagi 18 yoshga to'lmagan\n"
-                "obunachlar taxminan nechta?</i>\n"
-                "<i>(Yo'q bo'lsa 0 yozing)</i>",
-                parse_mode='HTML'
-            )
+        # Bu qadamga faqat OAV yo'lidagi hisobotlar keladi endi
+        # (Offline/Online uchun qatnashchilar_soni yosh guruhlaridan avtomatik hisoblanadi)
+        ctx.user_data['step'] = STEP_OAV_PROOF
+        nom = OAV_NOMLAR.get(h.targibot_turi, 'OAV')
+        await update.message.reply_text(
+            f"✅ {nom} soni: <b>{msg}</b>\n\n"
+            f"🔗 Havola (URL) yuboring\n"
+            f"<i>yoki screenshot/foto yuboring.</i>",
+            parse_mode='HTML'
+        )
         return
 
     if step == STEP_AGE1:
@@ -572,7 +568,8 @@ async def text_msg(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"✅ Yosh ma'lumotlari saqlandi:\n"
             f"  • 18 yoshgacha: <b>{age1}</b> kishi\n"
-            f"  • 18 yoshdan katta: <b>{age2}</b> kishi\n\n"
+            f"  • 18 yoshdan katta: <b>{age2}</b> kishi\n"
+            f"  • Jami: <b>{age1 + age2}</b> kishi\n\n"
             f"{label}",
             parse_mode='HTML'
         )

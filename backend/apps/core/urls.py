@@ -73,6 +73,8 @@ urlpatterns = [
     # Murojaat (kiberjinoyat jabrlanuvchilari)
     path('murojaat/usullar/',        views.murojaat_usullar),
     path('murojaat/kasblar/',        views.murojaat_kasblar),
+    path('murojaat/shablon/',        views.murojaat_shablon),
+    path('murojaat/import/',         views.murojaat_import),
     path('murojaat/hisobot/',        views.murojaat_hisobot),
     path('murojaat/hisobot/excel/',  views.murojaat_hisobot_excel),
     path('murojaat/',                views.murojaat_list_create),

@@ -346,13 +346,13 @@ def hisobot(request):
     extra_where, extra_params = get_viloyat_sql(request)
     sql = f"""
         SELECT tuman.tuman_nomi, mahalla.mahalla_nomi, mahalla.inspektor_fio, mahalla.inspektor_tel,
-               (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s AND h.targibot_turi=1) AS offline_targibot_soni,
-               (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s AND h.targibot_turi=1) AS offline_qatnashchilar,
-               (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s AND h.targibot_turi=2) AS online_targibot_soni,
-               (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s AND h.targibot_turi=2) AS online_qatnashchilar,
                (SELECT COUNT(*) FROM murojaat m WHERE m.mahalla_id=mahalla.id
                 AND m.sana BETWEEN %s AND %s) AS murojaat_soni
@@ -426,24 +426,24 @@ def hisobot_kunlik(request):
 
     sql = f"""
         SELECT tuman.tuman_nomi, mahalla.mahalla_nomi, mahalla.inspektor_fio, mahalla.inspektor_tel,
-               (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt)=%s AND h.targibot_turi=1) AS offline_soni,
-               (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt)=%s AND h.targibot_turi=1) AS offline_qatnashchi,
-               (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt)=%s AND h.targibot_turi=2) AS online_soni,
-               (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt)=%s AND h.targibot_turi=2) AS online_qatnashchi,
                (SELECT COUNT(*) FROM hisobot h2 WHERE h2.mahalla_id=mahalla.id
                 AND DATE(h2.qushilgan_vaqt)=%s AND h2.status IN (1,2,3)) AS yuborilgan_soni,
                (mahalla.ogohlantirish_kun = %s) AS ogohlantirish_yuborildi,
-               (SELECT COALESCE(SUM(h.offline_18_gacha),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COALESCE(SUM(h.offline_18_gacha),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt)=%s) AS offline_18_gacha,
-               (SELECT COALESCE(SUM(h.offline_18_katta),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COALESCE(SUM(h.offline_18_katta),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt)=%s) AS offline_18_katta,
-               (SELECT COALESCE(SUM(h.online_18_gacha),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COALESCE(SUM(h.online_18_gacha),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt)=%s) AS online_18_gacha,
-               (SELECT COALESCE(SUM(h.online_18_katta),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COALESCE(SUM(h.online_18_katta),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt)=%s) AS online_18_katta
         FROM mahalla JOIN tuman ON mahalla.tuman_id=tuman.id
         WHERE (mahalla.navbatchilik_kuni1=%s OR mahalla.navbatchilik_kuni2=%s){extra_where}
@@ -485,7 +485,7 @@ def hisobot_tumanlar(request):
                COALESCE(SUM(h.targibot_turi=7), 0) AS internet_soni
         FROM tuman
         LEFT JOIN mahalla ON mahalla.tuman_id=tuman.id
-        LEFT JOIN hisobot h ON h.mahalla_id=mahalla.id
+        LEFT JOIN hisobot h ON h.mahalla_id=mahalla.id AND h.status=2
             AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s
         WHERE 1=1{extra_where}
         GROUP BY tuman.id ORDER BY tuman.id
@@ -537,7 +537,7 @@ def hisobot_viloyatlar(request):
         FROM viloyat v
         LEFT JOIN tuman t    ON t.viloyat_id = v.id
         LEFT JOIN mahalla m  ON m.tuman_id   = t.id
-        LEFT JOIN hisobot h  ON h.mahalla_id = m.id
+        LEFT JOIN hisobot h  ON h.mahalla_id = m.id AND h.status=2
              AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s
         GROUP BY v.id, v.nomi
         ORDER BY v.id
@@ -949,13 +949,13 @@ def arxiv_yaratish(request):
     extra_where, extra_params = get_viloyat_sql(request)
     sql = f"""
         SELECT tuman.tuman_nomi, mahalla.mahalla_nomi, mahalla.inspektor_fio, mahalla.inspektor_tel,
-               (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt)=%s AND h.targibot_turi=1) AS offline_soni,
-               (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt)=%s AND h.targibot_turi=1) AS offline_qatnashchi,
-               (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt)=%s AND h.targibot_turi=2) AS online_soni,
-               (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+               (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt)=%s AND h.targibot_turi=2) AS online_qatnashchi
         FROM mahalla JOIN tuman ON mahalla.tuman_id=tuman.id
         WHERE (mahalla.navbatchilik_kuni1=%s OR mahalla.navbatchilik_kuni2=%s){extra_where}
@@ -1726,7 +1726,7 @@ def kunlik_ishlar_excel(request):  # noqa: C901
         bot = {r[0]: dict(zip(dc[1:], r[1:])) for r in cur.fetchall()}
 
     ki_agg = (KunlikIshlar.objects
-        .filter(sana__gte=start_str, sana__lte=end_str).values('viloyat_id')
+        .filter(sana__gte=start_str, sana__lte=end_str, status=3).values('viloyat_id')
         .annotate(
             tv=DSum('oav_tv_soni'), radio=DSum('oav_radio_soni'),
             gazeta=DSum('oav_gazeta_jurnal_soni'), internet=DSum('oav_internet_soni'),
@@ -2091,6 +2091,135 @@ def murojaat_detail(request, pk):
     return Response({'ok': True})
 
 
+# ── Murojaat import ───────────────────────────────────────────────────────────
+MUROJAAT_IMPORT_HEADERS = [
+    'Sana (YYYY-MM-DD)', 'Viloyat', 'Tuman', 'Mahalla', 'F.I.SH', 'Jinsi (erkak/ayol)',
+    'Yoshi', 'Telefon', 'Sodir etish usuli', 'Kasbi', 'Kasb izohi',
+    "O'quv muassasasi", 'Kurs', 'Ijtimoiy tarmoq', 'Zarar (so\'m)',
+    'Holat (yangi/takroriy/aybi/togri)', 'Fabula',
+]
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def murojaat_shablon(request):
+    """GET /api/murojaat/shablon/ — import uchun bo'sh Excel shablon."""
+    misol = [
+        '2026-01-15', 'Toshkent viloyati', 'Chirchiq', 'Guliston MFY',
+        'Aliyev Vali Aliyevich', 'erkak', 35, '+998901234567',
+        'Telegram orqali firibgarlik', "Ishchi", '', '', '', 'telegram',
+        1500000, 'yangi', "Qisqacha voqea bayoni...",
+    ]
+    audit(request, 'murojaat_shablon', 'Import shabloni yuklab olindi')
+    return excel_response(MUROJAAT_IMPORT_HEADERS, [misol], 'murojaat_shablon.xlsx')
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def murojaat_import(request):
+    """POST /api/murojaat/import/ — to'ldirilgan Excel faylni bazaga import qiladi."""
+    f = request.FILES.get('fayl')
+    if not f:
+        return Response({'error': 'Excel fayl yuklanmadi'}, status=400)
+
+    role = request.user.role
+    if role not in ('viloyat', 'respublika'):
+        return Response({'error': 'Ruxsat yo\'q'}, status=403)
+
+    try:
+        wb = openpyxl.load_workbook(f, data_only=True)
+        ws = wb.active
+    except Exception:
+        return Response({'error': 'Excel faylni o\'qib bo\'lmadi'}, status=400)
+
+    JINSI_MAP  = {'erkak': 'erkak', 'ayol': 'ayol', 'erkak ': 'erkak', 'ayol ': 'ayol'}
+    HOLAT_MAP  = {'yangi': 'yangi', 'takroriy': 'takroriy', 'aybi': 'aybi', 'togri': 'togri'}
+    TARMOQ_MAP = {'telegram': 'telegram', 'instagram': 'instagram', 'facebook': 'facebook',
+                  'tiktok': 'tiktok', 'bigolive': 'bigolive', 'boshqa': 'boshqa'}
+
+    usullar = list(MurojaatUsul.objects.all())
+    kasblar = list(MurojaatKasb.objects.all())
+
+    def topish(nomi, ro_yxat):
+        if not nomi:
+            return None
+        nomi = str(nomi).strip().lower()
+        for item in ro_yxat:
+            if item.nomi.strip().lower() == nomi:
+                return item
+        for item in ro_yxat:
+            if nomi in item.nomi.strip().lower():
+                return item
+        return None
+
+    created = 0
+    errors  = []
+    rows = list(ws.iter_rows(min_row=2, values_only=True))
+    for idx, row in enumerate(rows, start=2):
+        if not row or not any(row):
+            continue
+        (sana, viloyat_nomi, tuman_nomi, mahalla_nomi, fish, jinsi, yosh, telefon,
+         usul_nomi, kasb_nomi, kasb_izoh, kasb_muassasa, kasb_kurs,
+         tarmoq, zarar, holat, fabula) = (list(row) + [None] * 17)[:17]
+
+        try:
+            if not sana:
+                errors.append({'qator': idx, 'sabab': 'Sana kiritilmagan'})
+                continue
+            sana_val = sana.date() if hasattr(sana, 'date') else datetime.strptime(str(sana), '%Y-%m-%d').date()
+
+            if role == 'viloyat':
+                viloyat_id = request.user.viloyat_id
+            else:
+                vil = Viloyat.objects.filter(nomi__icontains=str(viloyat_nomi or '').strip()).first()
+                if not vil:
+                    errors.append({'qator': idx, 'sabab': f'Viloyat topilmadi: {viloyat_nomi}'})
+                    continue
+                viloyat_id = vil.id
+
+            tuman = Tuman.objects.filter(
+                viloyat_id=viloyat_id, tuman_nomi__icontains=str(tuman_nomi or '').strip()
+            ).first()
+            if not tuman:
+                errors.append({'qator': idx, 'sabab': f'Tuman topilmadi: {tuman_nomi}'})
+                continue
+
+            mahalla = None
+            if mahalla_nomi:
+                mahalla = Mahalla.objects.filter(
+                    tuman_id=tuman.id, mahalla_nomi__icontains=str(mahalla_nomi).strip()
+                ).first()
+
+            usul = topish(usul_nomi, usullar)
+            kasb = topish(kasb_nomi, kasblar)
+
+            Murojaat.objects.create(
+                sana=sana_val,
+                viloyat_id=viloyat_id,
+                tuman_id=tuman.id,
+                mahalla_id=mahalla.id if mahalla else None,
+                fish=str(fish or '').strip(),
+                jinsi=JINSI_MAP.get(str(jinsi or '').strip().lower(), ''),
+                telefon=str(telefon or '').strip(),
+                fabula=str(fabula or '').strip(),
+                zarar=zarar or None,
+                usul=usul,
+                kasb=kasb,
+                yosh=int(yosh) if yosh else None,
+                holat=HOLAT_MAP.get(str(holat or '').strip().lower(), 'yangi'),
+                ijtimoiy_tarmoq=TARMOQ_MAP.get(str(tarmoq or '').strip().lower(), ''),
+                kasb_izoh=str(kasb_izoh or '').strip(),
+                kasb_muassasa=str(kasb_muassasa or '').strip(),
+                kasb_kurs=int(kasb_kurs) if kasb_kurs else None,
+                yaratuvchi=request.user,
+            )
+            created += 1
+        except Exception as e:
+            errors.append({'qator': idx, 'sabab': str(e)})
+
+    audit(request, 'murojaat_import', f"{created} ta import qilindi, {len(errors)} ta xato")
+    return Response({'created': created, 'errors': errors})
+
+
 # ── Murojaat Hisobot ──────────────────────────────────────────────────────────
 def _cnt(qs, v_ids):
     res = {vid: 0 for vid in v_ids}
@@ -2384,18 +2513,6 @@ def _bot_agg(viloyat_id, sana_str):
         targibot_turi__in=[1, 2],
     )
 
-    def kat_count(k):
-        return qs.filter(mahalla__in=Mahalla.objects.filter(
-            id__in=Hisobot.objects.filter(
-                status=2, targibot_turi__in=[1,2],
-                qushilgan_vaqt__date=sana,
-                mahalla__tuman__viloyat_id=viloyat_id,
-                targibot_utgan_joy__in=list(
-                    TargibotUtkazilganJoy.objects.filter(kategoriya=k).values_list('id', flat=True)
-                )
-            ).values_list('mahalla_id', flat=True)
-        )).count()
-
     # kategoriya bo'yicha hisobotlar soni (bir kunda)
     kat_ids = {k: list(TargibotUtkazilganJoy.objects.filter(kategoriya=k).values_list('id', flat=True))
                for k in range(1, 12)}
@@ -2626,10 +2743,10 @@ def samaradorlik_hisobot(request):
             SELECT v.nomi AS nomi,
                    (SELECT COUNT(*) FROM hisobot h JOIN mahalla m ON h.mahalla_id=m.id
                     JOIN tuman t ON m.tuman_id=t.id
-                    WHERE t.viloyat_id=v.id AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS targibot_soni,
+                    WHERE t.viloyat_id=v.id AND h.status=2 AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS targibot_soni,
                    (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h JOIN mahalla m ON h.mahalla_id=m.id
                     JOIN tuman t ON m.tuman_id=t.id
-                    WHERE t.viloyat_id=v.id AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS qatnashchilar,
+                    WHERE t.viloyat_id=v.id AND h.status=2 AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS qatnashchilar,
                    (SELECT COUNT(*) FROM murojaat mr WHERE mr.viloyat_id=v.id AND mr.sana BETWEEN %s AND %s) AS murojaat_soni
             FROM viloyat v ORDER BY v.nomi
         """
@@ -2638,9 +2755,9 @@ def samaradorlik_hisobot(request):
         viloyat_id = request.user.viloyat_id
         sql = """
             SELECT mahalla.mahalla_nomi AS nomi, tuman.tuman_nomi,
-                   (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+                   (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                     AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS targibot_soni,
-                   (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+                   (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                     AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS qatnashchilar,
                    (SELECT COUNT(*) FROM murojaat m WHERE m.mahalla_id=mahalla.id AND m.sana BETWEEN %s AND %s) AS murojaat_soni
             FROM mahalla JOIN tuman ON mahalla.tuman_id=tuman.id
@@ -2681,7 +2798,7 @@ def xavfli_mahallalar(request):
             SELECT v.nomi AS nomi, NULL AS tuman_nomi,
                    (SELECT COUNT(*) FROM hisobot h JOIN mahalla m ON h.mahalla_id=m.id
                     JOIN tuman t ON m.tuman_id=t.id
-                    WHERE t.viloyat_id=v.id AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS targibot_soni,
+                    WHERE t.viloyat_id=v.id AND h.status=2 AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS targibot_soni,
                    (SELECT COUNT(*) FROM murojaat mr WHERE mr.viloyat_id=v.id AND mr.sana BETWEEN %s AND %s) AS murojaat_soni
             FROM viloyat v
             HAVING murojaat_soni > 0
@@ -2692,7 +2809,7 @@ def xavfli_mahallalar(request):
         viloyat_id = request.user.viloyat_id
         sql = """
             SELECT mahalla.mahalla_nomi AS nomi, tuman.tuman_nomi,
-                   (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id
+                   (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                     AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS targibot_soni,
                    (SELECT COUNT(*) FROM murojaat m WHERE m.mahalla_id=mahalla.id AND m.sana BETWEEN %s AND %s) AS murojaat_soni
             FROM mahalla JOIN tuman ON mahalla.tuman_id=tuman.id
@@ -2743,7 +2860,7 @@ def oylik_dinamika(request):
                        COALESCE(SUM(h.qatnashchilar_soni),0) AS qatnashchilar
                 FROM hisobot h JOIN mahalla m ON h.mahalla_id=m.id
                 JOIN tuman t ON m.tuman_id=t.id
-                WHERE t.viloyat_id=%s AND YEAR(h.qushilgan_vaqt)=%s
+                WHERE t.viloyat_id=%s AND h.status=2 AND YEAR(h.qushilgan_vaqt)=%s
                 GROUP BY MONTH(h.qushilgan_vaqt)
             """
             murojaat_sql = """
@@ -2757,7 +2874,7 @@ def oylik_dinamika(request):
             targibot_sql = """
                 SELECT MONTH(qushilgan_vaqt) AS oy, COUNT(*) AS soni,
                        COALESCE(SUM(qatnashchilar_soni),0) AS qatnashchilar
-                FROM hisobot WHERE YEAR(qushilgan_vaqt)=%s
+                FROM hisobot WHERE status=2 AND YEAR(qushilgan_vaqt)=%s
                 GROUP BY MONTH(qushilgan_vaqt)
             """
             murojaat_sql = """
@@ -2773,7 +2890,7 @@ def oylik_dinamika(request):
                    COALESCE(SUM(h.qatnashchilar_soni),0) AS qatnashchilar
             FROM hisobot h JOIN mahalla m ON h.mahalla_id=m.id
             JOIN tuman t ON m.tuman_id=t.id
-            WHERE t.viloyat_id=%s AND YEAR(h.qushilgan_vaqt)=%s
+            WHERE t.viloyat_id=%s AND h.status=2 AND YEAR(h.qushilgan_vaqt)=%s
             GROUP BY MONTH(h.qushilgan_vaqt)
         """
         murojaat_sql = """
@@ -2825,7 +2942,7 @@ def haftalik_holat(request):
                        COALESCE(SUM(qatnashchilar_soni),0) AS qatnashchilar
                 FROM hisobot h JOIN mahalla m ON h.mahalla_id=m.id
                 JOIN tuman t ON m.tuman_id=t.id
-                WHERE t.viloyat_id=%s AND qushilgan_vaqt >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
+                WHERE t.viloyat_id=%s AND h.status=2 AND qushilgan_vaqt >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
                 GROUP BY YEARWEEK(qushilgan_vaqt, 1) ORDER BY hafta DESC LIMIT 12
             """
             murojaat_sql = """
@@ -2842,7 +2959,7 @@ def haftalik_holat(request):
                        COUNT(*) AS soni,
                        COALESCE(SUM(qatnashchilar_soni),0) AS qatnashchilar
                 FROM hisobot
-                WHERE qushilgan_vaqt >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
+                WHERE status=2 AND qushilgan_vaqt >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
                 GROUP BY YEARWEEK(qushilgan_vaqt, 1) ORDER BY hafta DESC LIMIT 12
             """
             murojaat_sql = """
@@ -2861,7 +2978,7 @@ def haftalik_holat(request):
                    COALESCE(SUM(h.qatnashchilar_soni),0) AS qatnashchilar
             FROM hisobot h JOIN mahalla m ON h.mahalla_id=m.id
             JOIN tuman t ON m.tuman_id=t.id
-            WHERE t.viloyat_id=%s AND h.qushilgan_vaqt >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
+            WHERE t.viloyat_id=%s AND h.status=2 AND h.qushilgan_vaqt >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
             GROUP BY YEARWEEK(h.qushilgan_vaqt, 1) ORDER BY hafta DESC LIMIT 12
         """
         murojaat_sql = """
@@ -2929,7 +3046,7 @@ def hamkor_tashkilot_hisobot(request):
             LEFT JOIN hamkor_xodim hx ON hx.tashkilot_id = ht.id AND hx.is_active = 1
             LEFT JOIN hisobot h ON h.hamkor_xodim_id IN (
                 SELECT id FROM hamkor_xodim WHERE tashkilot_id = ht.id
-            ) AND h.status IN (1,2) {date_filter}
+            ) AND h.status = 2 {date_filter}
             WHERE 1=1 {v_filter}
             GROUP BY ht.id, ht.nomi, ht.turi, v.nomi
             ORDER BY targibot_soni DESC
@@ -2947,7 +3064,7 @@ def hamkor_tashkilot_hisobot(request):
             LEFT JOIN hamkor_xodim hx ON hx.tashkilot_id = ht.id AND hx.is_active = 1
             LEFT JOIN hisobot h ON h.hamkor_xodim_id IN (
                 SELECT id FROM hamkor_xodim WHERE tashkilot_id = ht.id
-            ) AND h.status IN (1,2) {date_filter}
+            ) AND h.status = 2 {date_filter}
             WHERE ht.viloyat_id = %s
             GROUP BY ht.id, ht.nomi, ht.turi
             ORDER BY targibot_soni DESC

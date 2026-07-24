@@ -259,6 +259,82 @@ function KorishModal({ m, kasblar, usullar, onClose }) {
   )
 }
 
+// ── Excel import bloki ───────────────────────────────────────────────────────
+function MurojaatImport({ onDone }) {
+  const [loading, setLoading] = useState(false)
+  const [natija,  setNatija]  = useState(null)
+
+  const shablonYuklab = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/murojaat/shablon/', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) throw new Error('Xato')
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url
+      a.download = 'murojaat_shablon.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch { toast.error('Yuklab bo\'lmadi') }
+  }
+
+  const faylTanlandi = async e => {
+    const fayl = e.target.files?.[0]
+    e.target.value = ''
+    if (!fayl) return
+    setLoading(true)
+    setNatija(null)
+    try {
+      const fd = new FormData()
+      fd.append('fayl', fayl)
+      const { data } = await api.post('/murojaat/import/', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      setNatija(data)
+      if (data.created > 0) toast.success(`${data.created} ta murojaat import qilindi`)
+      if (data.errors?.length) toast.error(`${data.errors.length} ta qatorda xato bor`)
+      onDone?.()
+    } catch (e) {
+      toast.error(e?.response?.data?.error || 'Import qilib bo\'lmadi')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="card mb-6 bg-indigo-50 border border-indigo-200">
+      <h2 className="text-base font-semibold text-indigo-900 mb-3">📥 Eski murojaatlarni import qilish</h2>
+      <div className="flex flex-wrap items-center gap-3">
+        <button onClick={shablonYuklab} className="px-4 py-2 border border-indigo-300 rounded-xl text-sm text-indigo-700 bg-white hover:bg-indigo-100">
+          📄 Shablonni yuklab olish
+        </button>
+        <label className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 cursor-pointer">
+          {loading ? '⏳ Yuklanmoqda...' : '📤 To\'ldirilgan faylni import qilish'}
+          <input type="file" accept=".xlsx" onChange={faylTanlandi} disabled={loading} className="hidden" />
+        </label>
+      </div>
+      {natija && (
+        <div className="mt-3 text-sm">
+          <p className="text-green-700">✅ {natija.created} ta murojaat qo'shildi.</p>
+          {natija.errors?.length > 0 && (
+            <div className="mt-2 text-red-600">
+              <p className="font-medium">❌ {natija.errors.length} ta qatorda xato:</p>
+              <ul className="list-disc list-inside mt-1 max-h-40 overflow-y-auto">
+                {natija.errors.map((er, i) => (
+                  <li key={i}>{er.qator}-qator: {er.sabab}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Asosiy sahifa ─────────────────────────────────────────────────────────────
 export default function Murojaat() {
   const role = localStorage.getItem('role')
@@ -351,6 +427,8 @@ export default function Murojaat() {
     <div>
       <KorishModal m={korishObj} kasblar={kasblar} usullar={usullar} onClose={() => setKorishObj(null)}/>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Kiberjinoyat murojaatlari</h1>
+
+      <MurojaatImport onDone={loadList} />
 
       {/* ── Forma (faqat viloyat admini uchun) ── */}
       {role !== 'respublika' && <div className="card mb-6">

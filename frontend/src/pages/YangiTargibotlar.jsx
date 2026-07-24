@@ -32,6 +32,11 @@ function HisobotKarta({ h, isRad, onToggleRad, sabab, onSabab, onLightbox }) {
             <span className={h.targibot_turi === 1 ? 'badge-blue' : 'badge-green'}>
               {h.targibot_turi === 1 ? '📢 Offline' : '🌐 Online'}
             </span>
+            {h.dublikat_id && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                ⚠️ #{h.dublikat_id}-hisobot bilan bir xil (joy+kun)
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap gap-x-4 text-sm text-gray-600">
             <span>👤 {h.inspektor_fio}</span>

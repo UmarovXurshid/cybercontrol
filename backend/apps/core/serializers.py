@@ -41,6 +41,7 @@ class HisobotSerializer(serializers.ModelSerializer):
     joy_nomi      = serializers.SerializerMethodField()
     has_location  = serializers.SerializerMethodField()
     turi_nomi     = serializers.SerializerMethodField()
+    dublikat_id   = serializers.SerializerMethodField()
 
     # N+1 muammoni hal qilish: TargibotUtkazilganJoy ni bir marta olish
     _joy_cache = None
@@ -70,6 +71,17 @@ class HisobotSerializer(serializers.ModelSerializer):
         if obj.targibot_utgan_joy:
             return self._get_joy_cache().get(obj.targibot_utgan_joy, '')
         return ''
+
+    def get_dublikat_id(self, obj):
+        if not obj.targibot_utgan_joy or not obj.qushilgan_vaqt:
+            return None
+        match = Hisobot.objects.filter(
+            mahalla_id=obj.mahalla_id,
+            targibot_utgan_joy=obj.targibot_utgan_joy,
+            qushilgan_vaqt__date=obj.qushilgan_vaqt.date(),
+            status__in=[1, 2],
+        ).exclude(id=obj.id).order_by('qushilgan_vaqt').first()
+        return match.id if match else None
 
     class Meta:
         model  = Hisobot
