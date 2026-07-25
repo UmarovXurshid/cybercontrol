@@ -512,6 +512,17 @@ def hisobot_tumanlar(request):
         r['gazeta_soni']            = int(r['gazeta_soni']  or 0)
         r['jurnal_soni']            = int(r['jurnal_soni']  or 0)
         r['internet_soni']          = int(r['internet_soni'] or 0)
+
+    if request.GET.get('excel'):
+        headers = ['#', 'Tuman', 'Mahallalar', 'Offline targ.', 'Offline fuk.',
+                   'Online targ.', 'Online fuk.', 'Jami fuqarolar', 'Murojaat']
+        data = [[i+1, r['tuman_nomi'], r['mahalla_soni'],
+                 r['offline_targibot_soni'], r['offline_qatnashchilar'],
+                 r['online_targibot_soni'], r['online_qatnashchilar'], r['jami_fuqarolar'], r['murojaat_soni']]
+                for i, r in enumerate(rows)]
+        audit(request, 'excel_yuklab_olish', f"Tumanlar hisoboti {start}–{end}")
+        return excel_response(headers, data, f"hisobot_tumanlar_{start}_{end}.xlsx")
+
     return Response(rows)
 
 # ── Hisobot viloyatlar bo'yicha (faqat respublika admin) ─────────────────────
