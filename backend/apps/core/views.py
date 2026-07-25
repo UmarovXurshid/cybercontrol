@@ -470,6 +470,8 @@ def hisobot_tumanlar(request):
     sql = f"""
         SELECT tuman.tuman_nomi,
                (SELECT COUNT(*) FROM mahalla m WHERE m.tuman_id=tuman.id AND m.is_tuman=0) AS mahalla_soni,
+               (SELECT COUNT(*) FROM murojaat mr JOIN mahalla m2 ON mr.mahalla_id=m2.id
+                WHERE m2.tuman_id=tuman.id AND mr.sana BETWEEN %s AND %s) AS murojaat_soni,
                COALESCE(SUM(h.targibot_turi=1), 0)  AS offline_targibot_soni,
                COALESCE(SUM(CASE WHEN h.targibot_turi=1 THEN h.qatnashchilar_soni ELSE 0 END),0) AS offline_qatnashchilar,
                COALESCE(SUM(h.targibot_turi=2), 0)  AS online_targibot_soni,
@@ -491,7 +493,7 @@ def hisobot_tumanlar(request):
         GROUP BY tuman.id ORDER BY tuman.id
     """
     with connection.cursor() as cur:
-        cur.execute(sql, [start, end] + extra_params)
+        cur.execute(sql, [start, end, start, end] + extra_params)
         cols = [c[0] for c in cur.description]
         rows = [dict(zip(cols, r)) for r in cur.fetchall()]
     for r in rows:
@@ -500,6 +502,7 @@ def hisobot_tumanlar(request):
         r['offline_qatnashchilar']  = int(r['offline_qatnashchilar']  or 0)
         r['online_qatnashchilar']   = int(r['online_qatnashchilar']   or 0)
         r['jami_fuqarolar']         = r['offline_qatnashchilar'] + r['online_qatnashchilar']
+        r['murojaat_soni']          = int(r['murojaat_soni'] or 0)
         r['offline_18_gacha']       = int(r['offline_18_gacha'] or 0)
         r['offline_18_katta']       = int(r['offline_18_katta'] or 0)
         r['online_18_gacha']        = int(r['online_18_gacha']  or 0)

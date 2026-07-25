@@ -77,7 +77,7 @@ export default function HisobotTumanlar() {
       <div className="card overflow-hidden p-0">
         <table className="w-full">
           <thead><tr>
-            {['#','Tuman','Mahallalar','Offline targ.','Offline fuk.','Online targ.','Online fuk.','Jami'].map(h=>(
+            {['#','Tuman','Mahallalar','Offline targ.','Offline fuk.','Online targ.','Online fuk.','Jami','Murojaat'].map(h=>(
               <th key={h} className="table-header text-left">{h}</th>
             ))}
           </tr></thead>
@@ -108,11 +108,16 @@ export default function HisobotTumanlar() {
                   </td>
                   <td className="table-cell text-sm">{r.online_qatnashchilar||0}</td>
                   <td className="table-cell font-bold text-gray-900">{r.jami_fuqarolar||0}</td>
+                  <td className="table-cell">
+                    {r.murojaat_soni > 0
+                      ? <span className="badge-red">{r.murojaat_soni}</span>
+                      : <span className="text-gray-400">0</span>}
+                  </td>
                 </tr>
                 {isOpen && (
                   <tr>
                     <td></td>
-                    <td colSpan={7} className="px-4 pb-4">
+                    <td colSpan={8} className="px-4 pb-4">
                       <div className="bg-gray-50 rounded-xl overflow-hidden border border-gray-200">
                         <table className="w-full text-sm">
                           <thead><tr>
@@ -148,7 +153,7 @@ export default function HisobotTumanlar() {
               </Fragment>
               )
             })}
-            {list.length===0 && <tr><td colSpan={8} className="text-center py-10 text-gray-400">Ma'lumot topilmadi</td></tr>}
+            {list.length===0 && <tr><td colSpan={9} className="text-center py-10 text-gray-400">Ma'lumot topilmadi</td></tr>}
             {list.length>0 && (
               <tr className="bg-gray-100 font-semibold">
                 <td className="table-cell" colSpan={2}>Jami ({list.length} tuman)</td>
@@ -158,6 +163,7 @@ export default function HisobotTumanlar() {
                 <td className="table-cell"><span className="badge-green">{totalOnline}</span></td>
                 <td className="table-cell">{list.reduce((s,r)=>s+Number(r.online_qatnashchilar||0),0)}</td>
                 <td className="table-cell font-bold">{totalFuqaro}</td>
+                <td className="table-cell"><span className="badge-red">{list.reduce((s,r)=>s+Number(r.murojaat_soni||0),0)}</span></td>
               </tr>
             )}
           </tbody>
