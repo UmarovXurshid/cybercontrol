@@ -57,6 +57,7 @@ urlpatterns = [
     path('kunlik-ishlar/saqlash/',      views.kunlik_ishlar_save),
     path('kunlik-ishlar/tasdiqlash/',   views.kunlik_ishlar_tasdiqlash),
     path('kunlik-ishlar/list/',         views.kunlik_ishlar_list),
+    path('kunlik-ishlar/oraliq/',       views.kunlik_ishlar_oraliq),
     path('kunlik-ishlar/rasm/',          views.kunlik_ishlar_rasm),
     path('infratuzilma/',                views.infratuzilma),
     path('kunlik-ishlar/excel/',         views.kunlik_ishlar_excel),

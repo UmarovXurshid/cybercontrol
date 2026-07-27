@@ -2515,17 +2515,26 @@ def murojaat_hisobot_excel(request):
 #  KUNLIK ISHLAR
 # ════════════════════════════════════════════════════════════════════
 
-def _bot_agg(viloyat_id, sana_str):
-    """Bot hisobotlaridan shu viloyat + sana uchun agregatsiya."""
+def _bot_agg(viloyat_id, sana_str, end_str=None):
+    """Bot hisobotlaridan shu viloyat + sana (yoki sana oralig'i) uchun agregatsiya."""
     from django.db.models import Sum, Count, Q
     sana = date.fromisoformat(sana_str)
 
-    qs = Hisobot.objects.filter(
-        status=2,
-        mahalla__tuman__viloyat_id=viloyat_id,
-        qushilgan_vaqt__date=sana,
-        targibot_turi__in=[1, 2],
-    )
+    if end_str:
+        oraliq = date.fromisoformat(end_str)
+        qs = Hisobot.objects.filter(
+            status=2,
+            mahalla__tuman__viloyat_id=viloyat_id,
+            qushilgan_vaqt__date__range=[sana, oraliq],
+            targibot_turi__in=[1, 2],
+        )
+    else:
+        qs = Hisobot.objects.filter(
+            status=2,
+            mahalla__tuman__viloyat_id=viloyat_id,
+            qushilgan_vaqt__date=sana,
+            targibot_turi__in=[1, 2],
+        )
 
     # kategoriya bo'yicha hisobotlar soni (bir kunda)
     kat_ids = {k: list(TargibotUtkazilganJoy.objects.filter(kategoriya=k).values_list('id', flat=True))
@@ -2691,6 +2700,55 @@ def kunlik_ishlar_list(request):
         result.append(d)
 
     return Response(result)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def kunlik_ishlar_oraliq(request):
+    """GET /api/kunlik-ishlar/oraliq/?start=&end= — faqat o'z viloyati, sana oralig'i bo'yicha jamlangan (bir qator)"""
+    from django.db.models import Sum
+    start = request.GET.get('start', date.today().isoformat())
+    end   = request.GET.get('end',   date.today().isoformat())
+    role  = request.user.role
+
+    if role == 'viloyat':
+        viloyat_id = request.user.viloyat_id
+    else:
+        viloyat_id = request.GET.get('viloyat')
+    if not viloyat_id:
+        return Response({'error': 'viloyat kerak'}, status=400)
+
+    viloyat = Viloyat.objects.get(id=viloyat_id)
+    qs = KunlikIshlar.objects.filter(viloyat_id=viloyat_id, sana__range=[start, end])
+
+    agg = qs.aggregate(
+        oav_tv_soni            = Sum('oav_tv_soni'),
+        oav_radio_soni         = Sum('oav_radio_soni'),
+        oav_gazeta_jurnal_soni = Sum('oav_gazeta_jurnal_soni'),
+        oav_internet_soni      = Sum('oav_internet_soni'),
+        oav_video_soni         = Sum('oav_video_soni'),
+        mat_ijtimoiy_tarmoq    = Sum('mat_ijtimoiy_tarmoq'),
+        mat_oz_tashabbusi      = Sum('mat_oz_tashabbusi'),
+        mat_flayer_buklet      = Sum('mat_flayer_buklet'),
+        mat_led_ekran          = Sum('mat_led_ekran'),
+        mat_boshqa             = Sum('mat_boshqa'),
+        suhbat_soni            = Sum('suhbat_soni'),
+        iio_xizmat_soni        = Sum('iio_xizmat_soni'),
+        hamkor_tashkilot_soni  = Sum('hamkor_tashkilot_soni'),
+        sayber_soni            = Sum('sayber_soni'),
+        iio_tv_murojaati       = Sum('iio_tv_murojaati'),
+    )
+    for k, v in agg.items():
+        agg[k] = int(v or 0)
+
+    return Response({
+        'viloyat_nomi' : viloyat.nomi,
+        'start'        : start,
+        'end'          : end,
+        'kun_soni'     : qs.count(),
+        **agg,
+        'bot'          : _bot_agg(viloyat_id, start, end),
+    })
 
 
 @api_view(['GET', 'PUT'])
