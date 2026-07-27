@@ -17,6 +17,7 @@ import Mahallalar from './pages/Mahallalar'
 import Tumanlar from './pages/Tumanlar'
 import KunlikMalumotnoma from './pages/KunlikMalumotnoma'
 import KunlikIshlar from './pages/KunlikIshlar'
+import KunlikIshlarHisobot from './pages/KunlikIshlarHisobot'
 import Qamrov from './pages/Qamrov'
 import HamkorTashkilotlar from './pages/HamkorTashkilotlar'
 
@@ -70,6 +71,7 @@ export default function App() {
           <Route path="hisobot"                              element={<Hisobot/>}/>
           <Route path="hisobot-kunlik"                       element={<HisobotKunlik/>}/>
           <Route path="hisobot-tumanlar"                       element={<HisobotTumanlar/>}/>
+          <Route path="hisobot-kunlik-ishlar"                  element={<KunlikIshlarHisobot/>}/>
           <Route path="samaradorlik"                           element={<Samaradorlik/>}/>
           <Route path="xavfli-hududlar"                        element={<XavfliMahallalar/>}/>
           <Route path="oylik-dinamika"                         element={<OylikDinamika/>}/>

@@ -283,86 +283,6 @@ function RespublikaListView({ sana, onSelect }) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   VILOYAT: xohlagan sana oralig'i bo'yicha o'z hisoboti (vazirlikka o'xshash, bir qator)
-═══════════════════════════════════════════════════════════════════════════════ */
-function OraliqHisobot() {
-  const [start, setStart] = useState(today)
-  const [end, setEnd]     = useState(today)
-  const [data, setData]   = useState(null)
-  const [loading, setLoading] = useState(false)
-
-  const load = async () => {
-    setLoading(true)
-    try {
-      const res = await api.get(`/kunlik-ishlar/oraliq/?start=${start}&end=${end}`)
-      setData(res.data)
-    } catch { toast.error("Ma'lumot yuklanmadi") }
-    finally { setLoading(false) }
-  }
-
-  useEffect(() => { load() }, [])
-
-  return (
-    <div className="mb-6">
-      <div className="bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-t-lg">
-        📅 Xohlagan sana oralig'i bo'yicha hisobot
-      </div>
-      <div className="border border-gray-200 rounded-b-lg bg-white p-4">
-        <div className="flex flex-wrap items-end gap-3 mb-4">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Boshlanish sanasi</label>
-            <input type="date" value={start} onChange={e => setStart(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none" />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Tugash sanasi</label>
-            <input type="date" value={end} onChange={e => setEnd(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none" />
-          </div>
-          <button onClick={load} disabled={loading}
-            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium disabled:opacity-60">
-            {loading ? '⏳' : '🔍'} Ko'rish
-          </button>
-        </div>
-
-        {data && (
-          <div className="overflow-hidden rounded-lg border border-gray-200">
-            <table className="w-full text-sm">
-              <thead className="bg-indigo-700 text-white">
-                <tr>
-                  <th className="px-4 py-2 text-left">Viloyat</th>
-                  <th className="px-4 py-2 text-center">Kun soni</th>
-                  <th className="px-4 py-2 text-center">Uchrashuvlar</th>
-                  <th className="px-4 py-2 text-center">Qatnashchilar</th>
-                  <th className="px-4 py-2 text-center">OAV</th>
-                  <th className="px-4 py-2 text-center">Materiallar</th>
-                  <th className="px-4 py-2 text-center">Probatsiya</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-t bg-white">
-                  <td className="px-4 py-2 font-medium">{data.viloyat_nomi}</td>
-                  <td className="px-4 py-2 text-center">{data.kun_soni}</td>
-                  <td className="px-4 py-2 text-center">{data.bot?.jami || 0}</td>
-                  <td className="px-4 py-2 text-center">{(data.bot?.fuk_jami || 0).toLocaleString()}</td>
-                  <td className="px-4 py-2 text-center">
-                    {(data.oav_tv_soni||0)+(data.oav_radio_soni||0)+(data.oav_gazeta_jurnal_soni||0)+(data.oav_internet_soni||0)+(data.oav_video_soni||0)}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    {(data.mat_ijtimoiy_tarmoq||0)+(data.mat_oz_tashabbusi||0)+(data.mat_flayer_buklet||0)+(data.mat_led_ekran||0)+(data.mat_boshqa||0)}
-                  </td>
-                  <td className="px-4 py-2 text-center">{data.bot?.kat11 || 0}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/* ══════════════════════════════════════════════════════════════════════════════
    INFRATUZILMA PANELI — viloyat targ'ibot joylar umumiy soni
 ═══════════════════════════════════════════════════════════════════════════════ */
 const INFRA_FIELDS = [
@@ -606,9 +526,6 @@ export default function KunlikIshlar() {
           </div>
         )}
       </div>
-
-      {/* ── VILOYAT: xohlagan sana oralig'i bo'yicha o'z hisoboti ── */}
-      {isViloyat && <OraliqHisobot />}
 
       {/* ── Infratuzilma paneli (viloyat adminlarga va respublika detail ko'rinishda) ── */}
       {(isViloyat || (isRespublika && detailViloyat)) && (

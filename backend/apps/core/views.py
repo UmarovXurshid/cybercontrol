@@ -2741,6 +2741,8 @@ def kunlik_ishlar_oraliq(request):
     for k, v in agg.items():
         agg[k] = int(v or 0)
 
+    kat_nomlar = {f'kat{k}': v for k, v in TargibotUtkazilganJoy.KATEGORIYA}
+
     return Response({
         'viloyat_nomi' : viloyat.nomi,
         'start'        : start,
@@ -2748,6 +2750,7 @@ def kunlik_ishlar_oraliq(request):
         'kun_soni'     : qs.count(),
         **agg,
         'bot'          : _bot_agg(viloyat_id, start, end),
+        'kat_nomlar'   : kat_nomlar,
     })
 
 

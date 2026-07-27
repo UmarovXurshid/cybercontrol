@@ -33,10 +33,11 @@ const GROUPS = [
     label: 'Hisobotlar',
     icon: HisobotIcon,
     items: [
-      { to: '/hisobot',          icon: DocumentChartBarIcon, label: "Hisobot" },
-      { to: '/hisobot-kunlik',   icon: CalendarDaysIcon,     label: "Hisobot kunlik" },
-      { to: '/hisobot-tumanlar', icon: BuildingOfficeIcon,   label: "Hisobot tumanlar" },
-      { to: '/qamrov',           icon: MapIcon,              label: "Qamrov ko'rinishi" },
+      { to: '/hisobot',              icon: DocumentChartBarIcon,        label: "Hisobot" },
+      { to: '/hisobot-kunlik',       icon: CalendarDaysIcon,            label: "Hisobot kunlik" },
+      { to: '/hisobot-tumanlar',     icon: BuildingOfficeIcon,          label: "Hisobot tumanlar" },
+      { to: '/hisobot-kunlik-ishlar',icon: ClipboardDocumentCheckIcon,  label: "Kunlik ishlar hisoboti" },
+      { to: '/qamrov',               icon: MapIcon,                     label: "Qamrov ko'rinishi" },
     ],
   },
   {
