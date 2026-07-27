@@ -217,7 +217,7 @@ function RespublikaListView({ sana, onSelect }) {
                     <td className="px-4 py-2 text-center">
                       {(r.oav_tv_soni||0)+(r.oav_radio_soni||0)+(r.oav_gazeta_jurnal_soni||0)+(r.oav_internet_soni||0)+(r.oav_video_soni||0)}
                     </td>
-                    <td className="px-4 py-2 text-center">{r.bot?.kat13 || 0}</td>
+                    <td className="px-4 py-2 text-center">{r.bot?.kat11 || 0}</td>
                     <td className="px-4 py-2 text-center"><StatusBadge status={r.status}/></td>
                     <td className="px-4 py-2 text-center">
                       <div className="flex gap-1 justify-center">
@@ -267,7 +267,7 @@ function RespublikaListView({ sana, onSelect }) {
                 <td className="px-4 py-2 text-center">
                   {(r.oav_tv_soni||0)+(r.oav_radio_soni||0)+(r.oav_gazeta_jurnal_soni||0)+(r.oav_internet_soni||0)+(r.oav_video_soni||0)}
                 </td>
-                <td className="px-4 py-2 text-center">{r.bot?.kat13 || 0}</td>
+                <td className="px-4 py-2 text-center">{r.bot?.kat11 || 0}</td>
                 <td className="px-4 py-2 text-center"><StatusBadge status={r.status}/></td>
                 <td className="px-4 py-2 text-center">
                   <button onClick={() => onSelect(r.viloyat)}
