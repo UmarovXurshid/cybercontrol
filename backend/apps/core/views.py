@@ -3102,49 +3102,54 @@ def hamkor_tashkilot_hisobot(request):
         date_filter = "AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s"
         params = [start, end]
 
+    # Eslatma: hamkor_xodim (hx) va hisobot (h) ni bitta JOIN darajasida qo'shish
+    # "fan-out" (kartezian ko'payish) xatosiga olib kelardi — bitta tashkilotda
+    # N ta xodim va M ta hisobot bo'lsa, natija N*M qatorga ko'payib, targibot_soni
+    # va qatnashchilar sun'iy ravishda bir necha barobar oshib ko'rsatilardi.
+    # Shu sababli har biri alohida pastki so'rov (subquery) sifatida hisoblanadi.
     if role == 'respublika':
         v_filter = "AND ht.viloyat_id = %s" if sel_viloyat else ""
-        if sel_viloyat:
-            params = [sel_viloyat] + params
+        v_params = [sel_viloyat] if sel_viloyat else []
 
         sql = f"""
             SELECT
-                v.nomi            AS viloyat_nomi,
-                ht.id             AS tashkilot_id,
-                ht.nomi           AS tashkilot_nomi,
-                ht.turi           AS tashkilot_turi,
-                COUNT(DISTINCT hx.id)                        AS xodim_soni,
-                COUNT(h.id)                                  AS targibot_soni,
-                COALESCE(SUM(h.qatnashchilar_soni), 0)       AS qatnashchilar
+                v.nomi  AS viloyat_nomi,
+                ht.id   AS tashkilot_id,
+                ht.nomi AS tashkilot_nomi,
+                ht.turi AS tashkilot_turi,
+                (SELECT COUNT(*) FROM hamkor_xodim hx
+                 WHERE hx.tashkilot_id = ht.id AND hx.is_active = 1)              AS xodim_soni,
+                (SELECT COUNT(*) FROM hisobot h
+                 WHERE h.hamkor_xodim_id IN (SELECT id FROM hamkor_xodim WHERE tashkilot_id = ht.id)
+                 AND h.status = 2 {date_filter})                                 AS targibot_soni,
+                (SELECT COALESCE(SUM(h.qatnashchilar_soni), 0) FROM hisobot h
+                 WHERE h.hamkor_xodim_id IN (SELECT id FROM hamkor_xodim WHERE tashkilot_id = ht.id)
+                 AND h.status = 2 {date_filter})                                 AS qatnashchilar
             FROM hamkor_tashkilot ht
             JOIN viloyat v ON v.id = ht.viloyat_id
-            LEFT JOIN hamkor_xodim hx ON hx.tashkilot_id = ht.id AND hx.is_active = 1
-            LEFT JOIN hisobot h ON h.hamkor_xodim_id IN (
-                SELECT id FROM hamkor_xodim WHERE tashkilot_id = ht.id
-            ) AND h.status = 2 {date_filter}
             WHERE 1=1 {v_filter}
-            GROUP BY ht.id, ht.nomi, ht.turi, v.nomi
             ORDER BY targibot_soni DESC
         """
+        params = params + params + v_params
     else:
         sql = f"""
             SELECT
-                ht.id             AS tashkilot_id,
-                ht.nomi           AS tashkilot_nomi,
-                ht.turi           AS tashkilot_turi,
-                COUNT(DISTINCT hx.id)                        AS xodim_soni,
-                COUNT(h.id)                                  AS targibot_soni,
-                COALESCE(SUM(h.qatnashchilar_soni), 0)       AS qatnashchilar
+                ht.id   AS tashkilot_id,
+                ht.nomi AS tashkilot_nomi,
+                ht.turi AS tashkilot_turi,
+                (SELECT COUNT(*) FROM hamkor_xodim hx
+                 WHERE hx.tashkilot_id = ht.id AND hx.is_active = 1)              AS xodim_soni,
+                (SELECT COUNT(*) FROM hisobot h
+                 WHERE h.hamkor_xodim_id IN (SELECT id FROM hamkor_xodim WHERE tashkilot_id = ht.id)
+                 AND h.status = 2 {date_filter})                                 AS targibot_soni,
+                (SELECT COALESCE(SUM(h.qatnashchilar_soni), 0) FROM hisobot h
+                 WHERE h.hamkor_xodim_id IN (SELECT id FROM hamkor_xodim WHERE tashkilot_id = ht.id)
+                 AND h.status = 2 {date_filter})                                 AS qatnashchilar
             FROM hamkor_tashkilot ht
-            LEFT JOIN hamkor_xodim hx ON hx.tashkilot_id = ht.id AND hx.is_active = 1
-            LEFT JOIN hisobot h ON h.hamkor_xodim_id IN (
-                SELECT id FROM hamkor_xodim WHERE tashkilot_id = ht.id
-            ) AND h.status = 2 {date_filter}
             WHERE ht.viloyat_id = %s
-            GROUP BY ht.id, ht.nomi, ht.turi
             ORDER BY targibot_soni DESC
         """
-        params = params + [viloyat_id]
+        params = params + params + [viloyat_id]
 
     with connection.cursor() as cur:
         cur.execute(sql, params)
