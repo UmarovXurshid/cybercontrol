@@ -485,7 +485,7 @@ export default function Murojaat() {
       <KorishModal m={korishObj} kasblar={kasblar} usullar={usullar} onClose={() => setKorishObj(null)}/>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Kiberjinoyat murojaatlari</h1>
 
-      <MurojaatImport onDone={loadList} />
+      {role === 'respublika' && <MurojaatImport onDone={loadList} />}
 
       {/* ── Forma (faqat viloyat admini uchun) ── */}
       {role !== 'respublika' && <div className="card mb-6">
