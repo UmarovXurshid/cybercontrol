@@ -16,10 +16,27 @@ const KUNLAR = [
   { v: 5, l: 'Juma' }, { v: 6, l: 'Shanba' }, { v: 0, l: 'Yakshanba' }
 ]
 
+function excelDownload(url, filename) {
+  const token = localStorage.getItem('token')
+  fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    .then(r => r.blob())
+    .then(blob => {
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = filename
+      a.click()
+    })
+    .catch(() => toast.error('Excel yuklab bo\'lmadi'))
+}
+
 export default function Mahallalar() {
   const [list, setList]         = useState([])
   const [tumanlar, setTumanlar] = useState([])
   const [search, setSearch]     = useState('')
+  const [fTuman, setFTuman]     = useState('')
+  const [fTg, setFTg]           = useState('')
+  const [fInsp, setFInsp]       = useState('')
+  const [fTuri, setFTuri]       = useState('')
   const [modal, setModal]       = useState(false)
   const [form, setForm]         = useState(EMPTY)
   const [editId, setEditId]     = useState(null)
@@ -91,11 +108,29 @@ export default function Mahallalar() {
     finally { setDelId(null) }
   }
 
-  const filtered = list.filter(m =>
-    m.mahalla_nomi?.toLowerCase().includes(search.toLowerCase()) ||
-    m.tuman_nomi?.toLowerCase().includes(search.toLowerCase()) ||
-    m.inspektor_fio?.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = list.filter(m => {
+    const matchesSearch = !search ||
+      m.mahalla_nomi?.toLowerCase().includes(search.toLowerCase()) ||
+      m.tuman_nomi?.toLowerCase().includes(search.toLowerCase()) ||
+      m.inspektor_fio?.toLowerCase().includes(search.toLowerCase())
+    const botBor  = m.tg_id && Number(m.tg_id) > 0
+    const inspBor = !!(m.inspektor_fio && m.inspektor_fio.trim())
+    const matchesTuman = !fTuman || String(m.tuman) === String(fTuman)
+    const matchesTg    = !fTg    || (fTg === 'bor' ? botBor : !botBor)
+    const matchesInsp  = !fInsp  || (fInsp === 'bor' ? inspBor : !inspBor)
+    const matchesTuri  = !fTuri  || (fTuri === 'tuman' ? !!m.is_tuman : !m.is_tuman)
+    return matchesSearch && matchesTuman && matchesTg && matchesInsp && matchesTuri
+  })
+
+  const exportExcel = () => {
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    if (fTuman) params.set('tuman_id', fTuman)
+    if (fTg)    params.set('tg', fTg)
+    if (fInsp)  params.set('insp', fInsp)
+    if (fTuri)  params.set('turi', fTuri)
+    excelDownload(`/api/mahallalar/excel/?${params.toString()}`, 'mahallalar.xlsx')
+  }
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
@@ -165,19 +200,53 @@ export default function Mahallalar() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">
           Mahallalar
-          <span className="ml-2 text-base font-normal text-gray-400">({list.length})</span>
+          <span className="ml-2 text-base font-normal text-gray-400">({filtered.length}/{list.length})</span>
         </h1>
-        <button onClick={openAdd} className="btn-success">➕ Mahalla qo'shish</button>
+        <div className="flex gap-2">
+          <button onClick={exportExcel} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            📥 Excel yuklab olish
+          </button>
+          <button onClick={openAdd} className="btn-success">➕ Mahalla qo'shish</button>
+        </div>
       </div>
 
-      {/* Qidiruv */}
-      <div className="card mb-6">
+      {/* Qidiruv va filtrlar */}
+      <div className="card mb-6 space-y-3">
         <input
           className="input-field"
           placeholder="🔍 Mahalla, tuman yoki inspektor bo'yicha qidirish..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <select className="input-field" value={fTuman} onChange={e => setFTuman(e.target.value)}>
+            <option value="">— Barcha tumanlar —</option>
+            {tumanlar.map(t => (
+              <option key={t.id} value={t.id}>{t.tuman_nomi}</option>
+            ))}
+          </select>
+          <select className="input-field" value={fTg} onChange={e => setFTg(e.target.value)}>
+            <option value="">— Botga kirish holati —</option>
+            <option value="bor">✅ Botga kirgan</option>
+            <option value="yoq">❌ Botga kirmagan</option>
+          </select>
+          <select className="input-field" value={fInsp} onChange={e => setFInsp(e.target.value)}>
+            <option value="">— Inspektor holati —</option>
+            <option value="bor">✅ Inspektor bor</option>
+            <option value="yoq">⚠️ Vakant (bo'sh)</option>
+          </select>
+          <select className="input-field" value={fTuri} onChange={e => setFTuri(e.target.value)}>
+            <option value="">— Barcha turlar —</option>
+            <option value="mfy">MFY</option>
+            <option value="tuman">🏛 Tuman/Viloyat</option>
+          </select>
+        </div>
+        {(search || fTuman || fTg || fInsp || fTuri) && (
+          <button
+            onClick={() => { setSearch(''); setFTuman(''); setFTg(''); setFInsp(''); setFTuri('') }}
+            className="text-xs text-indigo-600 hover:text-indigo-800"
+          >✕ Filtrlarni tozalash</button>
+        )}
       </div>
 
       {/* Jadval */}

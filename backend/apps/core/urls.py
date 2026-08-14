@@ -12,6 +12,9 @@ router.register('hamkor-tashkilotlar', views.HamkorTashkilotViewSet, basename='h
 router.register('hamkor-xodimlar',     views.HamkorXodimViewSet,     basename='hamkor-xodim')
 
 urlpatterns = [
+    # Mahallalar (router'dan oldin — aks holda 'excel' pk sifatida ushlanadi)
+    path('mahallalar/excel/',          views.mahallalar_excel),
+
     path('', include(router.urls)),
 
     # Dashboard

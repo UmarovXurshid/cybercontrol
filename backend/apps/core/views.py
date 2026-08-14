@@ -854,6 +854,62 @@ class MahallaViewSet(viewsets.ModelViewSet):
         audit(self.request, 'mahalla_ochirish', f"Mahalla o'chirildi: {instance.mahalla_nomi}")
         instance.delete()
 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def mahallalar_excel(request):
+    """GET /api/mahallalar/excel/ — filtrlangan mahallalar ro'yxatini Excelga eksport qilish"""
+    vf = get_viloyat_qs_filter(request, 'tuman__viloyat_id')
+    qs = Mahalla.objects.select_related('tuman').filter(**vf)
+
+    tuman_id = request.GET.get('tuman_id')
+    if tuman_id:
+        qs = qs.filter(tuman_id=tuman_id)
+
+    tg = request.GET.get('tg')  # 'bor' | 'yoq'
+    if tg == 'bor':
+        qs = qs.exclude(Q(tg_id__isnull=True) | Q(tg_id=0))
+    elif tg == 'yoq':
+        qs = qs.filter(Q(tg_id__isnull=True) | Q(tg_id=0))
+
+    insp = request.GET.get('insp')  # 'bor' | 'yoq'
+    if insp == 'bor':
+        qs = qs.exclude(Q(inspektor_fio__isnull=True) | Q(inspektor_fio=''))
+    elif insp == 'yoq':
+        qs = qs.filter(Q(inspektor_fio__isnull=True) | Q(inspektor_fio=''))
+
+    turi = request.GET.get('turi')  # 'mfy' | 'tuman'
+    if turi == 'mfy':
+        qs = qs.filter(is_tuman=False)
+    elif turi == 'tuman':
+        qs = qs.filter(is_tuman=True)
+
+    search = request.GET.get('search', '').strip()
+    if search:
+        qs = qs.filter(
+            Q(mahalla_nomi__icontains=search) |
+            Q(tuman__tuman_nomi__icontains=search) |
+            Q(inspektor_fio__icontains=search)
+        )
+
+    qs = qs.order_by('tuman__tuman_nomi', 'mahalla_nomi')
+
+    KUNLAR = {0: 'Yakshanba', 1: 'Dushanba', 2: 'Seshanba', 3: 'Chorshanba',
+              4: 'Payshanba', 5: 'Juma', 6: 'Shanba'}
+    headers = ['#', 'Mahalla', 'Tuman', 'Inspektor', 'Telefon', 'Telegram ID',
+               'Navbatchilik kuni 1', 'Navbatchilik kuni 2', 'Turi']
+    data = []
+    for i, m in enumerate(qs, 1):
+        data.append([
+            i, m.mahalla_nomi, m.tuman.tuman_nomi if m.tuman else '',
+            m.inspektor_fio or '', m.inspektor_tel or '',
+            m.tg_id if m.tg_id else '',
+            KUNLAR.get(m.navbatchilik_kuni1, '') if m.navbatchilik_kuni1 is not None else '',
+            KUNLAR.get(m.navbatchilik_kuni2, '') if m.navbatchilik_kuni2 is not None else '',
+            'Tuman/Viloyat' if m.is_tuman else 'MFY',
+        ])
+    return excel_response(headers, data, 'mahallalar.xlsx')
+
 # ── Tuman CRUD ────────────────────────────────────────────────────────────────
 class TumanViewSet(viewsets.ModelViewSet):
     serializer_class    = TumanSerializer
