@@ -401,6 +401,7 @@ export default function Murojaat() {
   const [murojaatlar, setMurojaatlar] = useState([])
 
   const [form,      setForm]      = useState(EMPTY)
+  const [formVersion, setFormVersion] = useState(0)
   const [editId,    setEditId]    = useState(null)
   const [loading,   setLoading]   = useState(false)
   const [filter,    setFilter]    = useState({ start: '', end: '', tuman_id: '' })
@@ -446,7 +447,7 @@ export default function Murojaat() {
         await api.post('/murojaat/', form)
         toast.success('Saqlandi')
       }
-      setForm(EMPTY); setEditId(null)
+      setForm(EMPTY); setEditId(null); setFormVersion(v => v + 1)
       loadList()
     } catch (e) {
       toast.error(e?.response?.data?.detail || 'Xatolik')
@@ -548,6 +549,7 @@ export default function Murojaat() {
           </div>
           <div className="md:col-span-2 lg:col-span-3">
             <UsulSelector
+              key={formVersion}
               usullar={usullar}
               value={form.usul}
               onChange={v => setForm(p => ({ ...p, usul: v }))}
@@ -562,6 +564,7 @@ export default function Murojaat() {
         {/* Kasb kaskad selector */}
         <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
           <KasbSelector
+            key={formVersion}
             kasblar={kasblar}
             value={form.kasb}
             onChange={v => setForm(p => ({ ...p, kasb: v }))}
@@ -586,7 +589,7 @@ export default function Murojaat() {
             {editId ? '💾 Saqlash' : '➕ Qo\'shish'}
           </button>
           {editId && (
-            <button onClick={() => { setForm(EMPTY); setEditId(null) }}
+            <button onClick={() => { setForm(EMPTY); setEditId(null); setFormVersion(v => v + 1) }}
               className="px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
               Bekor qilish
             </button>
