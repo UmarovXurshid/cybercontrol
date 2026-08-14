@@ -16,7 +16,15 @@ class TumanSerializer(serializers.ModelSerializer):
 
 
 class MahallaSerializer(serializers.ModelSerializer):
-    tuman_nomi = serializers.CharField(source='tuman.tuman_nomi', read_only=True)
+    tuman_nomi          = serializers.CharField(source='tuman.tuman_nomi', read_only=True)
+    faol_inspektor_soni = serializers.SerializerMethodField()
+
+    def get_faol_inspektor_soni(self, obj):
+        val = getattr(obj, 'faol_inspektor_soni', None)
+        if val is not None:
+            return val
+        return obj.inspektorlar.filter(is_active=True).count()
+
     class Meta:
         model  = Mahalla
         fields = '__all__'

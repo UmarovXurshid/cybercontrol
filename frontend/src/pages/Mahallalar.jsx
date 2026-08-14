@@ -114,7 +114,7 @@ export default function Mahallalar() {
       m.tuman_nomi?.toLowerCase().includes(search.toLowerCase()) ||
       m.inspektor_fio?.toLowerCase().includes(search.toLowerCase())
     const botBor  = m.tg_id && Number(m.tg_id) > 0
-    const inspBor = !!(m.inspektor_fio && m.inspektor_fio.trim())
+    const inspBor = Number(m.faol_inspektor_soni) > 0
     const matchesTuman = !fTuman || String(m.tuman) === String(fTuman)
     const matchesTg    = !fTg    || (fTg === 'bor' ? botBor : !botBor)
     const matchesInsp  = !fInsp  || (fInsp === 'bor' ? inspBor : !inspBor)
