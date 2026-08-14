@@ -836,7 +836,11 @@ class MahallaViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         vf = get_viloyat_qs_filter(self.request, 'tuman__viloyat_id')
-        return Mahalla.objects.select_related('tuman').filter(**vf)
+        qs = Mahalla.objects.select_related('tuman').filter(**vf)
+        tuman_id = self.request.query_params.get('tuman_id')
+        if tuman_id:
+            qs = qs.filter(tuman_id=tuman_id)
+        return qs
 
     def perform_create(self, serializer):
         instance = serializer.save()
