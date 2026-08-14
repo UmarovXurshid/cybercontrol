@@ -37,6 +37,7 @@ const GROUPS = [
       { to: '/hisobot-kunlik',       icon: CalendarDaysIcon,            label: "Hisobot kunlik" },
       { to: '/hisobot-tumanlar',     icon: BuildingOfficeIcon,          label: "Hisobot tumanlar" },
       { to: '/hisobot-kunlik-ishlar',icon: ClipboardDocumentCheckIcon,  label: "Kunlik ishlar hisoboti" },
+      { to: '/murojaat-hisobot',     icon: ShieldExclamationIcon,      label: "Murojaat hisoboti" },
       { to: '/qamrov',               icon: MapIcon,                     label: "Qamrov ko'rinishi" },
     ],
   },

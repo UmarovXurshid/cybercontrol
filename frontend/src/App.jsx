@@ -28,6 +28,7 @@ import OylikDinamika from './pages/OylikDinamika'
 import HaftalikHolat from './pages/HafalikHolat'
 
 import Murojaat from './pages/Murojaat'
+import MurojaatHisobotTuman from './pages/MurojaatHisobotTuman'
 import RespublikaMurojaatHisobot from './pages/RespublikaMurojaatHisobot'
 
 // Respublika admin sahifalari
@@ -77,6 +78,7 @@ export default function App() {
           <Route path="oylik-dinamika"                         element={<OylikDinamika/>}/>
           <Route path="haftalik-holat"                         element={<HaftalikHolat/>}/>
           <Route path="murojaat"                              element={<Murojaat/>}/>
+          <Route path="murojaat-hisobot"                     element={<MurojaatHisobotTuman/>}/>
           <Route path="xabar-yuborish"                       element={<XabarYuborish/>}/>
           <Route path="tumanlar"                             element={<Tumanlar/>}/>
           <Route path="mahallalar"                           element={<Mahallalar/>}/>

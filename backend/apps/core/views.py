@@ -2239,12 +2239,13 @@ def murojaat_import(request):
 
 
 # ── Murojaat Hisobot ──────────────────────────────────────────────────────────
-def _cnt(qs, v_ids):
+def _cnt(qs, v_ids, group_field='viloyat_id'):
     res = {vid: 0 for vid in v_ids}
     res['total'] = qs.count()
-    for r in qs.values('viloyat_id').annotate(n=Count('id')):
-        if r['viloyat_id'] in res:
-            res[r['viloyat_id']] = r['n']
+    for r in qs.values(group_field).annotate(n=Count('id')):
+        gid = r[group_field]
+        if gid in res:
+            res[gid] = r['n']
     return res
 
 
@@ -2258,7 +2259,7 @@ def _hisobot_viloyatlar(request):
     return list(Viloyat.objects.values('id', 'nomi').order_by('id'))
 
 
-def _build_hisobot_rows(start, end, v_ids, vf=None):
+def _build_hisobot_rows(start, end, v_ids, vf=None, group_field='viloyat_id'):
     """Barcha hisobot qatorlarini hisoblash (API va Excel uchun umumiy)"""
     today_str = date.today().isoformat()
     P = Murojaat.objects.filter(sana__gte=start, sana__lte=end)
@@ -2281,7 +2282,7 @@ def _build_hisobot_rows(start, end, v_ids, vf=None):
 
     def r(tartib, nomi, daraja, f):
         return {'tartib': tartib, 'nomi': nomi, 'daraja': daraja,
-                'jami': _cnt(f(P), v_ids), 'bugun': _cnt(f(T), v_ids)}
+                'jami': _cnt(f(P), v_ids, group_field), 'bugun': _cnt(f(T), v_ids, group_field)}
 
     af = lambda q: q
 
@@ -2364,21 +2365,38 @@ def murojaat_hisobot(request):
     return Response({'viloyatlar': viloyatlar, 'rows': rows, 'start': start, 'end': end})
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def murojaat_hisobot_excel(request):
+def _hisobot_tumanlar(request):
+    """
+    Tuman kesimidagi hisobot uchun tumanlar ro'yxati.
+    Viloyat majburiy: 'viloyat' rolidagi foydalanuvchi uchun o'zining viloyati,
+    markaziy/respublika uchun ?viloyat= query param orqali tanlanadi.
+    Ixtiyoriy ?tuman= bo'lsa faqat o'sha bitta tuman qaytariladi (aniq filtr).
+    """
+    if request.user.role == 'viloyat':
+        viloyat_id = request.user.viloyat_id
+    else:
+        vid = request.GET.get('viloyat')
+        viloyat_id = int(vid) if vid else None
+
+    qs = Tuman.objects.all()
+    if viloyat_id:
+        qs = qs.filter(viloyat_id=viloyat_id)
+
+    tuman_id = request.GET.get('tuman')
+    if tuman_id:
+        qs = qs.filter(id=int(tuman_id))
+
+    tumanlar = list(qs.values('id', 'tuman_nomi').order_by('id'))
+    for t in tumanlar:
+        t['nomi'] = t.pop('tuman_nomi')
+    return tumanlar, viloyat_id
+
+
+def _build_hisobot_workbook(title, groups, rows, start, end):
+    """Excel workbook qurish (viloyat/tuman kesimlari uchun umumiy)."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
-    import io
-
-    start = request.GET.get('start', date.today().replace(day=1).isoformat())
-    end   = request.GET.get('end',   date.today().isoformat())
-
-    viloyatlar = _hisobot_viloyatlar(request)
-    v_ids = [v['id'] for v in viloyatlar]
-    vf = get_viloyat_qs_filter(request, 'viloyat_id')
-    rows  = _build_hisobot_rows(start, end, v_ids, vf)
 
     wb  = Workbook()
     ws  = wb.active
@@ -2404,14 +2422,14 @@ def murojaat_hisobot_excel(request):
     LT_GRAY   = fill('F2F2F2')
     WHITE_F   = fill('FFFFFF')
 
-    v_count   = len(viloyatlar)
+    v_count   = len(groups)
     # Ustunlar: A(№), B(Ko'rsatkich), C(JAMI), D(Bir kunda),
-    # E,F (viloyat1_jami, viloyat1_bugun), G,H, ...
-    total_cols = 2 + 1 + 1 + v_count * 2   # №+nomi + jami+bugun + viloyatlar
+    # E,F (guruh1_jami, guruh1_bugun), G,H, ...
+    total_cols = 2 + 1 + 1 + v_count * 2   # №+nomi + jami+bugun + guruhlar
 
     # ── 1-qator: Sarlavha ──
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
-    c = ws.cell(1, 1, f'KIBERJINOYAT MUROJAATLARI HISOBOTI   ({start} — {end})')
+    c = ws.cell(1, 1, f'{title}   ({start} — {end})')
     c.font      = fnt(bold=True, color='FFFFFF', size=12)
     c.fill      = DARK_BLUE
     c.alignment = ctr
@@ -2420,7 +2438,7 @@ def murojaat_hisobot_excel(request):
 
     # ── 2-qator: Ustun nomlari (1-qator) ──
     col_names = ['№', 'Кўрсаткичлар', 'ЖАМИ', 'Бир кунда']
-    for v in viloyatlar:
+    for v in groups:
         short = v['nomi'].replace(' viloyati','').replace(' viloayti','')
         col_names += [short, 'Бир кунда']
     for ci, h in enumerate(col_names, 1):
@@ -2487,8 +2505,8 @@ def murojaat_hisobot_excel(request):
         c.font = fnt(italic=True, color='555555', size=8)
         c.fill = bfill; c.alignment = ctr; c.border = brd
 
-        # Viloyatlar
-        for ci, v in enumerate(viloyatlar):
+        # Guruhlar (viloyat/tuman)
+        for ci, v in enumerate(groups):
             vj = ws.cell(er, 5+ci*2,   jd.get(v['id'], 0) or 0)
             vb = ws.cell(er, 6+ci*2,   bd.get(v['id'], 0) or 0)
             vj.font = fnt(); vj.fill = rfill if d==0 else WHITE_F
@@ -2509,7 +2527,7 @@ def murojaat_hisobot_excel(request):
         c3.fill = bfill; c3.alignment = ctr; c3.border = brd
         c4 = ws.cell(er, 4, '')
         c4.fill = bfill; c4.border = brd
-        for ci, v in enumerate(viloyatlar):
+        for ci, v in enumerate(groups):
             vb = ws.cell(er, 5+ci*2, bd.get(v['id'], 0) or 0)
             vb.font = fnt(italic=True, color='666666', size=8)
             vb.fill = bfill; vb.alignment = ctr; vb.border = brd
@@ -2518,11 +2536,81 @@ def murojaat_hisobot_excel(request):
         er += 1
 
     ws.freeze_panes = 'C3'
+    return wb
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def murojaat_hisobot_excel(request):
+    import io
+
+    start = request.GET.get('start', date.today().replace(day=1).isoformat())
+    end   = request.GET.get('end',   date.today().isoformat())
+
+    viloyatlar = _hisobot_viloyatlar(request)
+    v_ids = [v['id'] for v in viloyatlar]
+    vf = get_viloyat_qs_filter(request, 'viloyat_id')
+    rows  = _build_hisobot_rows(start, end, v_ids, vf)
+
+    wb = _build_hisobot_workbook('KIBERJINOYAT MUROJAATLARI HISOBOTI', viloyatlar, rows, start, end)
 
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
     fname = f'murojaat_hisobot_{start}_{end}.xlsx'
+    return HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="{fname}"'}
+    )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def murojaat_hisobot_tuman(request):
+    """Murojaatlar hisoboti — tuman kesimida (bitta viloyat ichida)."""
+    start = request.GET.get('start', date.today().replace(day=1).isoformat())
+    end   = request.GET.get('end',   date.today().isoformat())
+
+    tumanlar, viloyat_id = _hisobot_tumanlar(request)
+    if not viloyat_id:
+        return Response({'error': 'viloyat aniqlanmadi'}, status=400)
+
+    t_ids = [t['id'] for t in tumanlar]
+    vf = {'viloyat_id': viloyat_id}
+    tuman_id = request.GET.get('tuman')
+    if tuman_id:
+        vf['tuman_id'] = int(tuman_id)
+
+    rows = _build_hisobot_rows(start, end, t_ids, vf, group_field='tuman_id')
+    return Response({'tumanlar': tumanlar, 'rows': rows, 'start': start, 'end': end})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def murojaat_hisobot_tuman_excel(request):
+    import io
+
+    start = request.GET.get('start', date.today().replace(day=1).isoformat())
+    end   = request.GET.get('end',   date.today().isoformat())
+
+    tumanlar, viloyat_id = _hisobot_tumanlar(request)
+    if not viloyat_id:
+        return Response({'error': 'viloyat aniqlanmadi'}, status=400)
+
+    t_ids = [t['id'] for t in tumanlar]
+    vf = {'viloyat_id': viloyat_id}
+    tuman_id = request.GET.get('tuman')
+    if tuman_id:
+        vf['tuman_id'] = int(tuman_id)
+
+    rows = _build_hisobot_rows(start, end, t_ids, vf, group_field='tuman_id')
+    wb = _build_hisobot_workbook('KIBERJINOYAT MUROJAATLARI HISOBOTI (TUMANLAR)', tumanlar, rows, start, end)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f'murojaat_hisobot_tuman_{start}_{end}.xlsx'
     return HttpResponse(
         buf.read(),
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
