@@ -35,7 +35,6 @@ export default function Mahallalar() {
   const [search, setSearch]     = useState('')
   const [fTuman, setFTuman]     = useState('')
   const [fTg, setFTg]           = useState('')
-  const [fInsp, setFInsp]       = useState('')
   const [fTuri, setFTuri]       = useState('')
   const [modal, setModal]       = useState(false)
   const [form, setForm]         = useState(EMPTY)
@@ -114,12 +113,10 @@ export default function Mahallalar() {
       m.tuman_nomi?.toLowerCase().includes(search.toLowerCase()) ||
       m.inspektor_fio?.toLowerCase().includes(search.toLowerCase())
     const botBor  = m.tg_id && Number(m.tg_id) > 0
-    const inspBor = Number(m.faol_inspektor_soni) > 0
     const matchesTuman = !fTuman || String(m.tuman) === String(fTuman)
     const matchesTg    = !fTg    || (fTg === 'bor' ? botBor : !botBor)
-    const matchesInsp  = !fInsp  || (fInsp === 'bor' ? inspBor : !inspBor)
     const matchesTuri  = !fTuri  || (fTuri === 'tuman' ? !!m.is_tuman : !m.is_tuman)
-    return matchesSearch && matchesTuman && matchesTg && matchesInsp && matchesTuri
+    return matchesSearch && matchesTuman && matchesTg && matchesTuri
   })
 
   const exportExcel = () => {
@@ -127,7 +124,6 @@ export default function Mahallalar() {
     if (search) params.set('search', search)
     if (fTuman) params.set('tuman_id', fTuman)
     if (fTg)    params.set('tg', fTg)
-    if (fInsp)  params.set('insp', fInsp)
     if (fTuri)  params.set('turi', fTuri)
     excelDownload(`/api/mahallalar/excel/?${params.toString()}`, 'mahallalar.xlsx')
   }
@@ -218,7 +214,7 @@ export default function Mahallalar() {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <select className="input-field" value={fTuman} onChange={e => setFTuman(e.target.value)}>
             <option value="">— Barcha tumanlar —</option>
             {tumanlar.map(t => (
@@ -230,20 +226,15 @@ export default function Mahallalar() {
             <option value="bor">✅ Botga kirgan</option>
             <option value="yoq">❌ Botga kirmagan</option>
           </select>
-          <select className="input-field" value={fInsp} onChange={e => setFInsp(e.target.value)}>
-            <option value="">— Inspektor holati —</option>
-            <option value="bor">✅ Inspektor bor</option>
-            <option value="yoq">⚠️ Vakant (bo'sh)</option>
-          </select>
           <select className="input-field" value={fTuri} onChange={e => setFTuri(e.target.value)}>
             <option value="">— Barcha turlar —</option>
             <option value="mfy">MFY</option>
             <option value="tuman">🏛 Tuman/Viloyat</option>
           </select>
         </div>
-        {(search || fTuman || fTg || fInsp || fTuri) && (
+        {(search || fTuman || fTg || fTuri) && (
           <button
-            onClick={() => { setSearch(''); setFTuman(''); setFTg(''); setFInsp(''); setFTuri('') }}
+            onClick={() => { setSearch(''); setFTuman(''); setFTg(''); setFTuri('') }}
             className="text-xs text-indigo-600 hover:text-indigo-800"
           >✕ Filtrlarni tozalash</button>
         )}

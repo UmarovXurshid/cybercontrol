@@ -840,9 +840,6 @@ class MahallaViewSet(viewsets.ModelViewSet):
         tuman_id = self.request.query_params.get('tuman_id')
         if tuman_id:
             qs = qs.filter(tuman_id=tuman_id)
-        qs = qs.annotate(
-            faol_inspektor_soni=Count('inspektorlar', filter=Q(inspektorlar__is_active=True))
-        )
         return qs
 
     def perform_create(self, serializer):
@@ -874,16 +871,6 @@ def mahallalar_excel(request):
         qs = qs.exclude(Q(tg_id__isnull=True) | Q(tg_id=0))
     elif tg == 'yoq':
         qs = qs.filter(Q(tg_id__isnull=True) | Q(tg_id=0))
-
-    insp = request.GET.get('insp')  # 'bor' | 'yoq'
-    if insp in ('bor', 'yoq'):
-        qs = qs.annotate(
-            faol_inspektor_soni=Count('inspektorlar', filter=Q(inspektorlar__is_active=True))
-        )
-        if insp == 'bor':
-            qs = qs.filter(faol_inspektor_soni__gt=0)
-        else:
-            qs = qs.filter(faol_inspektor_soni=0)
 
     turi = request.GET.get('turi')  # 'mfy' | 'tuman'
     if turi == 'mfy':
