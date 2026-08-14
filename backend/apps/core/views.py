@@ -2248,11 +2248,24 @@ def _cnt(qs, v_ids):
     return res
 
 
-def _build_hisobot_rows(start, end, v_ids):
+def _hisobot_viloyatlar(request):
+    """Hisobotda ko'rsatiladigan viloyatlar ro'yxati — viloyat rolidagi foydalanuvchi faqat o'zinikini ko'radi."""
+    if request.user.role == 'viloyat':
+        return list(Viloyat.objects.filter(id=request.user.viloyat_id).values('id', 'nomi').order_by('id'))
+    vid = request.GET.get('viloyat')
+    if vid:
+        return list(Viloyat.objects.filter(id=int(vid)).values('id', 'nomi').order_by('id'))
+    return list(Viloyat.objects.values('id', 'nomi').order_by('id'))
+
+
+def _build_hisobot_rows(start, end, v_ids, vf=None):
     """Barcha hisobot qatorlarini hisoblash (API va Excel uchun umumiy)"""
     today_str = date.today().isoformat()
     P = Murojaat.objects.filter(sana__gte=start, sana__lte=end)
     T = Murojaat.objects.filter(sana=today_str)
+    if vf:
+        P = P.filter(**vf)
+        T = T.filter(**vf)
 
     def kf(ids):
         return lambda q: q.filter(kasb_id__in=ids)
@@ -2344,9 +2357,10 @@ def _build_hisobot_rows(start, end, v_ids):
 def murojaat_hisobot(request):
     start = request.GET.get('start', date.today().replace(day=1).isoformat())
     end   = request.GET.get('end',   date.today().isoformat())
-    viloyatlar = list(Viloyat.objects.values('id', 'nomi').order_by('id'))
+    viloyatlar = _hisobot_viloyatlar(request)
     v_ids = [v['id'] for v in viloyatlar]
-    rows = _build_hisobot_rows(start, end, v_ids)
+    vf = get_viloyat_qs_filter(request, 'viloyat_id')
+    rows = _build_hisobot_rows(start, end, v_ids, vf)
     return Response({'viloyatlar': viloyatlar, 'rows': rows, 'start': start, 'end': end})
 
 
@@ -2361,9 +2375,10 @@ def murojaat_hisobot_excel(request):
     start = request.GET.get('start', date.today().replace(day=1).isoformat())
     end   = request.GET.get('end',   date.today().isoformat())
 
-    viloyatlar = list(Viloyat.objects.values('id', 'nomi').order_by('id'))
+    viloyatlar = _hisobot_viloyatlar(request)
     v_ids = [v['id'] for v in viloyatlar]
-    rows  = _build_hisobot_rows(start, end, v_ids)
+    vf = get_viloyat_qs_filter(request, 'viloyat_id')
+    rows  = _build_hisobot_rows(start, end, v_ids, vf)
 
     wb  = Workbook()
     ws  = wb.active
