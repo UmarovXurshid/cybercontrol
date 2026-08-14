@@ -250,83 +250,94 @@ export default function MurojaatHisobotTuman() {
                 </div>
               )}
 
-              {/* Kasblar bo'yicha */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {chartData.length > 0 && (
+              {/* Usul, kasb va yosh kesimlari — birgalikda */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">Usul, kasb va yosh kesimlari bo'yicha</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Kasb kesimi */}
                   <div className="card">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Ijtimoiy holat bo'yicha</h3>
-                    <ResponsiveContainer width="100%" height={260}>
-                      <PieChart>
-                        <Pie data={chartData} dataKey="jami" nameKey="fullName"
-                          cx="50%" cy="50%" outerRadius={100} label={({ name, percent }) =>
-                            `${(percent * 100).toFixed(0)}%`}>
-                          {chartData.map((_, idx) => (
-                            <Cell key={idx} fill={COLORS[idx % COLORS.length]}/>
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(val, name) => [val, name]}/>
-                        <Legend iconSize={10} wrapperStyle={{ fontSize: 10 }}/>
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <h4 className="text-xs font-semibold text-gray-600 mb-3">Kasb kesimi bo'yicha</h4>
+                    {chartData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={260}>
+                        <PieChart>
+                          <Pie data={chartData} dataKey="jami" nameKey="fullName"
+                            cx="50%" cy="50%" outerRadius={90} label={({ percent }) =>
+                              `${(percent * 100).toFixed(0)}%`}>
+                            {chartData.map((_, idx) => (
+                              <Cell key={idx} fill={COLORS[idx % COLORS.length]}/>
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(val, name) => [val, name]}/>
+                          <Legend iconSize={8} wrapperStyle={{ fontSize: 9 }}/>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-[260px] flex items-center justify-center text-sm text-gray-400">Ma'lumot yo'q</div>
+                    )}
                   </div>
-                )}
 
-                {/* Usullar bo'yicha */}
-                {usulChartData.length > 0 && (
+                  {/* Usul kesimi */}
                   <div className="card">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Sodir etish usullari (TOP 10)</h3>
-                    <ResponsiveContainer width="100%" height={260}>
-                      <BarChart data={usulChartData} layout="vertical"
-                        margin={{ top: 5, right: 20, bottom: 5, left: 150 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false}/>
-                        <XAxis type="number" tick={{ fontSize: 9 }}/>
-                        <YAxis type="category" dataKey="name" tick={{ fontSize: 9 }} width={145}/>
-                        <Tooltip/>
-                        <Bar dataKey="jami" name="Jami" fill="#2e6da4" radius={[0,3,3,0]}>
-                          {usulChartData.map((_, idx) => (
-                            <Cell key={idx} fill={COLORS[idx % COLORS.length]}/>
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <h4 className="text-xs font-semibold text-gray-600 mb-3">Usul kesimi bo'yicha (TOP 10)</h4>
+                    {usulChartData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={260}>
+                        <BarChart data={usulChartData} layout="vertical"
+                          margin={{ top: 5, right: 20, bottom: 5, left: 100 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false}/>
+                          <XAxis type="number" tick={{ fontSize: 9 }}/>
+                          <YAxis type="category" dataKey="name" tick={{ fontSize: 9 }} width={95}/>
+                          <Tooltip/>
+                          <Bar dataKey="jami" name="Jami" fill="#2e6da4" radius={[0,3,3,0]}>
+                            {usulChartData.map((_, idx) => (
+                              <Cell key={idx} fill={COLORS[idx % COLORS.length]}/>
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-[260px] flex items-center justify-center text-sm text-gray-400">Ma'lumot yo'q</div>
+                    )}
                   </div>
-                )}
+
+                  {/* Yosh kesimi */}
+                  {(() => {
+                    const yoshLabels = ['18 yoshgacha','18-30','31-40','41-50','51-60','61+']
+                    let inE = false, inA = false
+                    const erkakYosh = [], ayolYosh = []
+                    data.rows.forEach(r => {
+                      if (r.nomi === 'ЭРКАК') { inE = true; inA = false; return }
+                      if (r.nomi === 'АЁЛ')   { inA = true; inE = false; return }
+                      if (r.section) { inE = false; inA = false; return }
+                      if (inE && r.daraja === 2) erkakYosh.push(r.jami?.total || 0)
+                      if (inA && r.daraja === 2) ayolYosh.push(r.jami?.total || 0)
+                    })
+                    const yoshData = yoshLabels.map((name, i) => ({
+                      name, Erkak: erkakYosh[i] || 0, Ayol: ayolYosh[i] || 0
+                    }))
+                    const yoshBor = yoshData.some(d => d.Erkak > 0 || d.Ayol > 0)
+                    return (
+                      <div className="card">
+                        <h4 className="text-xs font-semibold text-gray-600 mb-3">Yosh kesimi bo'yicha</h4>
+                        {yoshBor ? (
+                          <ResponsiveContainer width="100%" height={260}>
+                            <BarChart data={yoshData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0"/>
+                              <XAxis dataKey="name" tick={{ fontSize: 9 }}/>
+                              <YAxis tick={{ fontSize: 9 }}/>
+                              <Tooltip/>
+                              <Legend iconSize={8} wrapperStyle={{ fontSize: 9 }}/>
+                              <Bar dataKey="Erkak" fill="#1e3a5f" radius={[3,3,0,0]}/>
+                              <Bar dataKey="Ayol"  fill="#e91e8c" radius={[3,3,0,0]}/>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="h-[260px] flex items-center justify-center text-sm text-gray-400">Ma'lumot yo'q</div>
+                        )}
+                      </div>
+                    )
+                  })()}
+                </div>
               </div>
-
-              {/* Yosh va jinsi */}
-              {(() => {
-                const erkakRow = data.rows.find(r => r.nomi === 'ЭРКАК')
-                const ayolRow  = data.rows.find(r => r.nomi === 'АЁЛ')
-                const yoshLabels = ['18 yoshgacha','18-30','31-40','41-50','51-60','61+']
-                let inE = false, inA = false
-                const erkakYosh = [], ayolYosh = []
-                data.rows.forEach(r => {
-                  if (r.nomi === 'ЭРКАК') { inE = true; inA = false; return }
-                  if (r.nomi === 'АЁЛ')   { inA = true; inE = false; return }
-                  if (r.section) { inE = false; inA = false; return }
-                  if (inE && r.daraja === 2) erkakYosh.push(r.jami?.total || 0)
-                  if (inA && r.daraja === 2) ayolYosh.push(r.jami?.total || 0)
-                })
-                const yoshData = yoshLabels.map((name, i) => ({
-                  name, Erkak: erkakYosh[i] || 0, Ayol: ayolYosh[i] || 0
-                }))
-                return (
-                  <div className="card">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Yosh va jinsi bo'yicha</h3>
-                    <ResponsiveContainer width="100%" height={260}>
-                      <BarChart data={yoshData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0"/>
-                        <XAxis dataKey="name" tick={{ fontSize: 10 }}/>
-                        <YAxis tick={{ fontSize: 10 }}/>
-                        <Tooltip/>
-                        <Legend/>
-                        <Bar dataKey="Erkak" fill="#1e3a5f" radius={[3,3,0,0]}/>
-                        <Bar dataKey="Ayol"  fill="#e91e8c" radius={[3,3,0,0]}/>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )
-              })()}
             </div>
           )}
         </>
