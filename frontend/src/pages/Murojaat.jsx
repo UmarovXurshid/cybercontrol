@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import api from '../api'
 import toast from 'react-hot-toast'
 
@@ -18,6 +18,62 @@ const EMPTY = {
   sana: today, tuman: '', mahalla: '', fish: '', jinsi: '', telefon: '',
   fabula: '', zarar: '', usul: '', holat: 'yangi', ijtimoiy_tarmoq: '',
   kasb: '', kasb_izoh: '', kasb_muassasa: '', kasb_kurs: ''
+}
+
+// ── Qidiruvli tanlash (nom bo'yicha filtr) ────────────────────────────────────
+function SearchSelect({ options, value, onChange, placeholder = '— tanlang —', disabled = false }) {
+  const [open, setOpen]   = useState(false)
+  const [query, setQuery] = useState('')
+  const wrapRef = useRef(null)
+
+  const selected = options.find(o => String(o.id) === String(value))
+
+  useEffect(() => {
+    const onClickOutside = e => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) { setOpen(false); setQuery('') }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  const filtered = query
+    ? options.filter(o => o.label.toLowerCase().includes(query.toLowerCase()))
+    : options
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <input
+        type="text"
+        disabled={disabled}
+        className="input-field"
+        placeholder={placeholder}
+        value={open ? query : (selected?.label || '')}
+        onFocus={() => setOpen(true)}
+        onChange={e => { setQuery(e.target.value); setOpen(true) }}
+      />
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-56 overflow-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+          <div
+            className="px-3 py-2 text-sm text-gray-400 cursor-pointer hover:bg-gray-50"
+            onMouseDown={() => { onChange(''); setOpen(false); setQuery('') }}
+          >
+            {placeholder}
+          </div>
+          {filtered.map(o => (
+            <div key={o.id}
+              className="px-3 py-2 text-sm cursor-pointer hover:bg-indigo-50"
+              onMouseDown={() => { onChange(String(o.id)); setOpen(false); setQuery('') }}
+            >
+              {o.label}
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div className="px-3 py-2 text-sm text-gray-400">Topilmadi</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Usul kaskad tanlash ───────────────────────────────────────────────────────
@@ -442,17 +498,20 @@ export default function Murojaat() {
           </div>
           <div>
             <label className="form-label">Tuman *</label>
-            <select value={form.tuman} onChange={set('tuman')} className="input-field">
-              <option value="">— tanlang —</option>
-              {tumanlar.map(t => <option key={t.id} value={t.id}>{t.tuman_nomi}</option>)}
-            </select>
+            <SearchSelect
+              options={tumanlar.map(t => ({ id: t.id, label: t.tuman_nomi }))}
+              value={form.tuman}
+              onChange={id => setForm(p => ({ ...p, tuman: id }))}
+            />
           </div>
           <div>
             <label className="form-label">Mahalla</label>
-            <select value={form.mahalla} onChange={set('mahalla')} className="input-field">
-              <option value="">— tanlang —</option>
-              {mahallalar.map(m => <option key={m.id} value={m.id}>{m.mahalla_nomi}</option>)}
-            </select>
+            <SearchSelect
+              options={mahallalar.map(m => ({ id: m.id, label: m.mahalla_nomi }))}
+              value={form.mahalla}
+              onChange={id => setForm(p => ({ ...p, mahalla: id }))}
+              disabled={!form.tuman}
+            />
           </div>
           <div>
             <label className="form-label">F.I.SH</label>
