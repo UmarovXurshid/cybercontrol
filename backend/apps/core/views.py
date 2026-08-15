@@ -9,6 +9,8 @@ from datetime import date, datetime
 import os, io, requests, openpyxl
 from concurrent.futures import ThreadPoolExecutor
 from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.worksheet.datavalidation import DataValidation
+from openpyxl.utils import get_column_letter
 from docx import Document
 from docx.shared import Pt
 from django.http import FileResponse, HttpResponse
@@ -2167,18 +2169,98 @@ MUROJAAT_IMPORT_HEADERS = [
     'Holat (yangi/takroriy/aybi/togri)', 'Fabula',
 ]
 
+def _add_list_validation(ws, lst_ws, col_idx, col_letter, values, first_row=2, last_row=1000):
+    """Ustunga Excel tanlov (dropdown) validatsiyasini qo'shadi — qiymatlar yashirin varaqdan olinadi."""
+    if not values:
+        return
+    lst_col_letter = get_column_letter(col_idx)
+    for row_idx, v in enumerate(values, 1):
+        lst_ws.cell(row=row_idx, column=col_idx, value=v)
+    formula = f"'{lst_ws.title}'!${lst_col_letter}$1:${lst_col_letter}${len(values)}"
+    dv = DataValidation(type="list", formula1=formula, allow_blank=True, showErrorMessage=True)
+    dv.error     = "Ro'yxatdan tanlang"
+    dv.errorTitle = "Noto'g'ri qiymat"
+    dv.prompt     = "Ro'yxatdan tanlang yoki qidiring"
+    dv.promptTitle = "Tanlov"
+    ws.add_data_validation(dv)
+    dv.add(f"{col_letter}{first_row}:{col_letter}{last_row}")
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def murojaat_shablon(request):
-    """GET /api/murojaat/shablon/ — import uchun bo'sh Excel shablon."""
+    """GET /api/murojaat/shablon/ — import uchun tanlov ro'yxatlari (dropdown) bilan Excel shablon."""
     misol = [
         '2026-01-15', 'Toshkent viloyati', 'Chirchiq', 'Guliston MFY',
         'Aliyev Vali Aliyevich', 'erkak', 35, '+998901234567',
         'Telegram orqali firibgarlik', "Ishchi", '', '', '', 'telegram',
         1500000, 'yangi', "Qisqacha voqea bayoni...",
     ]
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Import'
+
+    header_font = Font(bold=True, color='FFFFFF')
+    header_fill = PatternFill('solid', fgColor='3730A3')
+    center      = Alignment(horizontal='center', vertical='center')
+    for col_idx, h in enumerate(MUROJAAT_IMPORT_HEADERS, 1):
+        cell = ws.cell(row=1, column=col_idx, value=h)
+        cell.font      = header_font
+        cell.fill      = header_fill
+        cell.alignment = center
+    for col_idx, val in enumerate(misol, 1):
+        ws.cell(row=2, column=col_idx, value=val)
+    for col in ws.columns:
+        max_len = max((len(str(c.value or '')) for c in col), default=0)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+
+    # ── Tanlov ro'yxatlari uchun yordamchi (yashirin) varaq ──────────────────
+    role = request.user.role
+    if role == 'viloyat':
+        viloyat_id      = request.user.viloyat_id
+        viloyat_nomlari = list(Viloyat.objects.filter(id=viloyat_id).values_list('nomi', flat=True))
+        tuman_nomlari   = list(Tuman.objects.filter(viloyat_id=viloyat_id).order_by('tuman_nomi').values_list('tuman_nomi', flat=True))
+        mahalla_nomlari = list(Mahalla.objects.filter(tuman__viloyat_id=viloyat_id).order_by('mahalla_nomi').values_list('mahalla_nomi', flat=True))
+    else:
+        viloyat_nomlari = list(Viloyat.objects.order_by('nomi').values_list('nomi', flat=True))
+        tuman_nomlari   = list(Tuman.objects.order_by('tuman_nomi').values_list('tuman_nomi', flat=True).distinct())
+        mahalla_nomlari = list(Mahalla.objects.order_by('mahalla_nomi').values_list('mahalla_nomi', flat=True).distinct())
+
+    usul_nomlari = []
+    for u in MurojaatUsul.objects.filter(ota_id__isnull=True).order_by('tartib'):
+        usul_nomlari.append(u.nomi)
+        for c in MurojaatUsul.objects.filter(ota_id=u.id).order_by('tartib'):
+            usul_nomlari.append(c.nomi)
+    kasb_nomlari = list(MurojaatKasb.objects.order_by('nomi').values_list('nomi', flat=True).distinct())
+
+    jinsi_royxat  = ['erkak', 'ayol']
+    holat_royxat  = ['yangi', 'takroriy', 'aybi', 'togri']
+    tarmoq_royxat = ['telegram', 'instagram', 'facebook', 'tiktok', 'bigolive', 'boshqa']
+
+    lst_ws = wb.create_sheet('Royxatlar')
+    lst_ws.sheet_state = 'hidden'
+
+    # Ustunlar: 1=Viloyat 2=Tuman 3=Mahalla 4=Usul 5=Kasb 6=Jinsi 7=Holat 8=Tarmoq
+    _add_list_validation(ws, lst_ws, 1, 'B', viloyat_nomlari)
+    _add_list_validation(ws, lst_ws, 2, 'C', tuman_nomlari)
+    _add_list_validation(ws, lst_ws, 3, 'D', mahalla_nomlari)
+    _add_list_validation(ws, lst_ws, 4, 'I', usul_nomlari)
+    _add_list_validation(ws, lst_ws, 5, 'J', kasb_nomlari)
+    _add_list_validation(ws, lst_ws, 6, 'F', jinsi_royxat)
+    _add_list_validation(ws, lst_ws, 7, 'P', holat_royxat)
+    _add_list_validation(ws, lst_ws, 8, 'N', tarmoq_royxat)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    resp = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    resp['Content-Disposition'] = 'attachment; filename="murojaat_shablon.xlsx"'
     audit(request, 'murojaat_shablon', 'Import shabloni yuklab olindi')
-    return excel_response(MUROJAAT_IMPORT_HEADERS, [misol], 'murojaat_shablon.xlsx')
+    return resp
 
 
 @api_view(['POST'])
