@@ -2390,10 +2390,19 @@ def murojaat_import(request):
                 continue
 
             mahalla = None
-            if mahalla_nomi:
-                mahalla = Mahalla.objects.filter(
-                    tuman_id=tuman.id, mahalla_nomi__icontains=str(mahalla_nomi).strip()
-                ).first()
+            m_nomi = str(mahalla_nomi or '').strip()
+            if m_nomi:
+                mahalla = Mahalla.objects.filter(tuman_id=tuman.id, mahalla_nomi__iexact=m_nomi).first()
+                if not mahalla:
+                    nomzodlar = list(Mahalla.objects.filter(tuman_id=tuman.id, mahalla_nomi__icontains=m_nomi))
+                    if len(nomzodlar) == 1:
+                        mahalla = nomzodlar[0]
+                    elif len(nomzodlar) > 1:
+                        errors.append({'qator': idx, 'sabab': f"Mahalla noaniq (bir nechta mos keldi): {mahalla_nomi}"})
+                        continue
+                    else:
+                        errors.append({'qator': idx, 'sabab': f'Mahalla topilmadi: {mahalla_nomi}'})
+                        continue
 
             usul = topish(usul_nomi, usullar)
             kasb = topish(kasb_nomi, kasblar)
