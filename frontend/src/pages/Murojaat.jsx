@@ -394,6 +394,7 @@ function MurojaatImport({ onDone }) {
 // ── Asosiy sahifa ─────────────────────────────────────────────────────────────
 export default function Murojaat() {
   const role = localStorage.getItem('role')
+  const [viloyatlar,  setViloyatlar]  = useState([])
   const [tumanlar,    setTumanlar]    = useState([])
   const [mahallalar,  setMahallalar]  = useState([])
   const [usullar,     setUsullar]     = useState([])
@@ -404,15 +405,20 @@ export default function Murojaat() {
   const [formVersion, setFormVersion] = useState(0)
   const [editId,    setEditId]    = useState(null)
   const [loading,   setLoading]   = useState(false)
-  const [filter,    setFilter]    = useState({ start: '', end: '', tuman_id: '' })
+  const [filter,    setFilter]    = useState({ start: '', end: '', viloyat_id: '', tuman_id: '' })
   const [korishObj, setKorishObj] = useState(null)
 
   useEffect(() => {
+    if (role === 'respublika') api.get('/viloyatlar/').then(r => setViloyatlar(r.data.results || r.data))
     api.get('/tumanlar/').then(r => setTumanlar(r.data.results || r.data))
     api.get('/murojaat/usullar/').then(r => setUsullar(r.data))
     api.get('/murojaat/kasblar/').then(r => setKasblar(r.data))
     loadList()
   }, [])
+
+  const filterTumanlar = filter.viloyat_id
+    ? tumanlar.filter(t => String(t.viloyat) === String(filter.viloyat_id))
+    : tumanlar
 
   useEffect(() => {
     if (form.tuman) {
@@ -426,9 +432,10 @@ export default function Murojaat() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (f.start)    params.append('start', f.start)
-      if (f.end)      params.append('end', f.end)
-      if (f.tuman_id) params.append('tuman_id', f.tuman_id)
+      if (f.start)      params.append('start', f.start)
+      if (f.end)        params.append('end', f.end)
+      if (f.viloyat_id) params.append('viloyat_id', f.viloyat_id)
+      if (f.tuman_id)   params.append('tuman_id', f.tuman_id)
       const { data } = await api.get(`/murojaat/?${params}`)
       setMurojaatlar(data)
     } catch { toast.error('Yuklab bo\'lmadi') }
@@ -609,16 +616,26 @@ export default function Murojaat() {
           <input type="date" value={filter.end}
             onChange={e => setFilter(p => ({ ...p, end: e.target.value }))} className="input-field w-40"/>
         </div>
+        {role === 'respublika' && (
+          <div>
+            <label className="form-label">Viloyat</label>
+            <select value={filter.viloyat_id}
+              onChange={e => setFilter(p => ({ ...p, viloyat_id: e.target.value, tuman_id: '' }))} className="input-field w-48">
+              <option value="">Barchasi</option>
+              {viloyatlar.map(v => <option key={v.id} value={v.id}>{v.nomi}</option>)}
+            </select>
+          </div>
+        )}
         <div>
           <label className="form-label">Tuman</label>
           <select value={filter.tuman_id}
             onChange={e => setFilter(p => ({ ...p, tuman_id: e.target.value }))} className="input-field w-48">
             <option value="">Barchasi</option>
-            {tumanlar.map(t => <option key={t.id} value={t.id}>{t.tuman_nomi}</option>)}
+            {filterTumanlar.map(t => <option key={t.id} value={t.id}>{t.tuman_nomi}</option>)}
           </select>
         </div>
         <button onClick={() => loadList(filter)} className="btn-primary">🔍 Qidirish</button>
-        <button onClick={() => { const f = { start:'', end:'', tuman_id:'' }; setFilter(f); loadList(f) }}
+        <button onClick={() => { const f = { start:'', end:'', viloyat_id:'', tuman_id:'' }; setFilter(f); loadList(f) }}
           className="px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
           ✕ Tozalash
         </button>
@@ -635,6 +652,7 @@ export default function Murojaat() {
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="table-header text-left">#</th>
                   <th className="table-header text-left">Sana</th>
+                  {role === 'respublika' && <th className="table-header text-left">Viloyat</th>}
                   <th className="table-header text-left">Tuman</th>
                   <th className="table-header text-left">F.I.SH</th>
                   <th className="table-header text-center">Jinsi</th>
@@ -649,11 +667,12 @@ export default function Murojaat() {
               </thead>
               <tbody>
                 {murojaatlar.length === 0 ? (
-                  <tr><td colSpan={12} className="py-10 text-center text-gray-400">Ma'lumot yo'q</td></tr>
+                  <tr><td colSpan={role === 'respublika' ? 13 : 12} className="py-10 text-center text-gray-400">Ma'lumot yo'q</td></tr>
                 ) : murojaatlar.map((m, i) => (
                   <tr key={m.id} className="hover:bg-gray-50 border-b border-gray-100">
                     <td className="table-cell text-gray-400">{i + 1}</td>
                     <td className="table-cell">{m.sana}</td>
+                    {role === 'respublika' && <td className="table-cell">{m.viloyat_nomi}</td>}
                     <td className="table-cell">{m.tuman_nomi}</td>
                     <td className="table-cell font-medium">{m.fish || '—'}</td>
                     <td className="table-cell text-center">{m.jinsi === 'erkak' ? '♂' : m.jinsi === 'ayol' ? '♀' : '—'}</td>

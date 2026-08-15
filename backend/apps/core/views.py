@@ -2090,14 +2090,17 @@ def murojaat_list_create(request):
     vf = get_viloyat_qs_filter(request, 'viloyat_id')
 
     if request.method == 'GET':
-        start  = request.GET.get('start')
-        end    = request.GET.get('end')
-        tuman  = request.GET.get('tuman_id')
+        start   = request.GET.get('start')
+        end     = request.GET.get('end')
+        viloyat = request.GET.get('viloyat_id')
+        tuman   = request.GET.get('tuman_id')
         qs = Murojaat.objects.filter(**vf).select_related('viloyat', 'tuman', 'mahalla', 'usul', 'kasb')
         if start:
             qs = qs.filter(sana__gte=start)
         if end:
             qs = qs.filter(sana__lte=end)
+        if viloyat:
+            qs = qs.filter(viloyat_id=viloyat)
         if tuman:
             qs = qs.filter(tuman_id=tuman)
         return Response(MurojaatSerializer(qs[:500], many=True).data)
