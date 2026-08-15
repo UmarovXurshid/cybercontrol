@@ -2190,11 +2190,35 @@ def _add_list_validation(ws, lst_ws, col_idx, col_letter, values, first_row=2, l
 @permission_classes([IsAuthenticated])
 def murojaat_shablon(request):
     """GET /api/murojaat/shablon/ — import uchun tanlov ro'yxatlari (dropdown) bilan Excel shablon."""
+    role = request.user.role
+    if role == 'viloyat':
+        viloyat_id      = request.user.viloyat_id
+        viloyat_nomlari = list(Viloyat.objects.filter(id=viloyat_id).values_list('nomi', flat=True))
+        tuman_nomlari   = list(Tuman.objects.filter(viloyat_id=viloyat_id).order_by('tuman_nomi').values_list('tuman_nomi', flat=True))
+        mahalla_nomlari = list(Mahalla.objects.filter(tuman__viloyat_id=viloyat_id).order_by('mahalla_nomi').values_list('mahalla_nomi', flat=True))
+    else:
+        viloyat_nomlari = list(Viloyat.objects.order_by('nomi').values_list('nomi', flat=True))
+        tuman_nomlari   = list(Tuman.objects.order_by('tuman_nomi').values_list('tuman_nomi', flat=True).distinct())
+        mahalla_nomlari = list(Mahalla.objects.order_by('mahalla_nomi').values_list('mahalla_nomi', flat=True).distinct())
+
+    # Usul/Kasb — ID bilan tanlanadi (ID-lar varag'ida ro'yxati bor)
+    usul_pairs = []
+    for u in MurojaatUsul.objects.filter(ota_id__isnull=True).order_by('tartib'):
+        usul_pairs.append((u.id, u.nomi))
+        for c in MurojaatUsul.objects.filter(ota_id=u.id).order_by('tartib'):
+            usul_pairs.append((c.id, '   ' + c.nomi))
+    kasb_pairs = list(MurojaatKasb.objects.order_by('nomi').values_list('id', 'nomi').distinct())
+
+    jinsi_pairs  = [(1, 'Erkak'), (2, 'Ayol')]
+    holat_pairs  = [(1, 'Yangi'), (2, 'Takroriy murojaat'), (3, "Fuqaroning o'z aybi"), (4, "To'g'ridan to'g'ri ariza")]
+    tarmoq_pairs = [(1, 'Telegram'), (2, 'Instagram'), (3, 'Facebook'), (4, 'TikTok'), (5, 'Bigo Live'), (6, 'Boshqa')]
+
     misol = [
         '2026-01-15', 'Toshkent viloyati', 'Chirchiq', 'Guliston MFY',
-        'Aliyev Vali Aliyevich', 'erkak', 35, '+998901234567',
-        'Telegram orqali firibgarlik', "Ishchi", '', '', '', 'telegram',
-        1500000, 'yangi', "Qisqacha voqea bayoni...",
+        'Aliyev Vali Aliyevich', 1, 35, '+998901234567',
+        usul_pairs[0][0] if usul_pairs else '', kasb_pairs[0][0] if kasb_pairs else '',
+        '', '', '', 1,
+        1500000, 1, "Qisqacha voqea bayoni...",
     ]
 
     wb = openpyxl.Workbook()
@@ -2215,41 +2239,51 @@ def murojaat_shablon(request):
         max_len = max((len(str(c.value or '')) for c in col), default=0)
         ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
 
+    # ── ID-lar (ko'rinadigan yordam varag'i) ──────────────────────────────────
+    id_ws = wb.create_sheet('ID-lar')
+    id_header_font = Font(bold=True, color='FFFFFF')
+    id_header_fill = PatternFill('solid', fgColor='065F46')
+
+    def _id_table(col, title, pairs):
+        c1, c2 = get_column_letter(col), get_column_letter(col + 1)
+        title_cell = id_ws.cell(row=1, column=col, value=title)
+        title_cell.font = id_header_font
+        title_cell.fill = id_header_fill
+        id_ws.merge_cells(f'{c1}1:{c2}1')
+        id_ws.cell(row=2, column=col,     value='ID').font   = Font(bold=True)
+        id_ws.cell(row=2, column=col + 1, value='Nomi').font = Font(bold=True)
+        for i, (pid, nomi) in enumerate(pairs, start=3):
+            id_ws.cell(row=i, column=col,     value=pid)
+            id_ws.cell(row=i, column=col + 1, value=nomi)
+        id_ws.column_dimensions[c1].width = 6
+        id_ws.column_dimensions[c2].width = max(20, min(45, max((len(str(n)) for _, n in pairs), default=10) + 2))
+
+    _id_table(1,  'JINSI',  jinsi_pairs)
+    _id_table(4,  'HOLAT',  holat_pairs)
+    _id_table(7,  'IJTIMOIY TARMOQ', tarmoq_pairs)
+    _id_table(10, 'SODIR ETISH USULI', usul_pairs)
+    _id_table(13, 'KASBI', kasb_pairs)
+    id_ws.freeze_panes = 'A3'
+
     # ── Tanlov ro'yxatlari uchun yordamchi (yashirin) varaq ──────────────────
-    role = request.user.role
-    if role == 'viloyat':
-        viloyat_id      = request.user.viloyat_id
-        viloyat_nomlari = list(Viloyat.objects.filter(id=viloyat_id).values_list('nomi', flat=True))
-        tuman_nomlari   = list(Tuman.objects.filter(viloyat_id=viloyat_id).order_by('tuman_nomi').values_list('tuman_nomi', flat=True))
-        mahalla_nomlari = list(Mahalla.objects.filter(tuman__viloyat_id=viloyat_id).order_by('mahalla_nomi').values_list('mahalla_nomi', flat=True))
-    else:
-        viloyat_nomlari = list(Viloyat.objects.order_by('nomi').values_list('nomi', flat=True))
-        tuman_nomlari   = list(Tuman.objects.order_by('tuman_nomi').values_list('tuman_nomi', flat=True).distinct())
-        mahalla_nomlari = list(Mahalla.objects.order_by('mahalla_nomi').values_list('mahalla_nomi', flat=True).distinct())
-
-    usul_nomlari = []
-    for u in MurojaatUsul.objects.filter(ota_id__isnull=True).order_by('tartib'):
-        usul_nomlari.append(u.nomi)
-        for c in MurojaatUsul.objects.filter(ota_id=u.id).order_by('tartib'):
-            usul_nomlari.append(c.nomi)
-    kasb_nomlari = list(MurojaatKasb.objects.order_by('nomi').values_list('nomi', flat=True).distinct())
-
-    jinsi_royxat  = ['erkak', 'ayol']
-    holat_royxat  = ['yangi', 'takroriy', 'aybi', 'togri']
-    tarmoq_royxat = ['telegram', 'instagram', 'facebook', 'tiktok', 'bigolive', 'boshqa']
-
     lst_ws = wb.create_sheet('Royxatlar')
     lst_ws.sheet_state = 'hidden'
 
-    # Ustunlar: 1=Viloyat 2=Tuman 3=Mahalla 4=Usul 5=Kasb 6=Jinsi 7=Holat 8=Tarmoq
+    usul_idlar   = [p[0] for p in usul_pairs]
+    kasb_idlar   = [p[0] for p in kasb_pairs]
+    jinsi_idlar  = [p[0] for p in jinsi_pairs]
+    holat_idlar  = [p[0] for p in holat_pairs]
+    tarmoq_idlar = [p[0] for p in tarmoq_pairs]
+
+    # Ustunlar: 1=Viloyat 2=Tuman 3=Mahalla 4=Usul(ID) 5=Kasb(ID) 6=Jinsi(ID) 7=Holat(ID) 8=Tarmoq(ID)
     _add_list_validation(ws, lst_ws, 1, 'B', viloyat_nomlari)
     _add_list_validation(ws, lst_ws, 2, 'C', tuman_nomlari)
     _add_list_validation(ws, lst_ws, 3, 'D', mahalla_nomlari)
-    _add_list_validation(ws, lst_ws, 4, 'I', usul_nomlari)
-    _add_list_validation(ws, lst_ws, 5, 'J', kasb_nomlari)
-    _add_list_validation(ws, lst_ws, 6, 'F', jinsi_royxat)
-    _add_list_validation(ws, lst_ws, 7, 'P', holat_royxat)
-    _add_list_validation(ws, lst_ws, 8, 'N', tarmoq_royxat)
+    _add_list_validation(ws, lst_ws, 4, 'I', usul_idlar)
+    _add_list_validation(ws, lst_ws, 5, 'J', kasb_idlar)
+    _add_list_validation(ws, lst_ws, 6, 'F', jinsi_idlar)
+    _add_list_validation(ws, lst_ws, 7, 'P', holat_idlar)
+    _add_list_validation(ws, lst_ws, 8, 'N', tarmoq_idlar)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -2286,20 +2320,42 @@ def murojaat_import(request):
     TARMOQ_MAP = {'telegram': 'telegram', 'instagram': 'instagram', 'facebook': 'facebook',
                   'tiktok': 'tiktok', 'bigolive': 'bigolive', 'boshqa': 'boshqa'}
 
+    # "ID-lar" varag'idagi tartib raqamlariga mos kodlar (murojaat_shablon bilan bir xil)
+    JINSI_KOD  = {'1': 'erkak', '2': 'ayol'}
+    HOLAT_KOD  = {'1': 'yangi', '2': 'takroriy', '3': 'aybi', '4': 'togri'}
+    TARMOQ_KOD = {'1': 'telegram', '2': 'instagram', '3': 'facebook', '4': 'tiktok', '5': 'bigolive', '6': 'boshqa'}
+
     usullar = list(MurojaatUsul.objects.all())
     kasblar = list(MurojaatKasb.objects.all())
 
     def topish(nomi, ro_yxat):
-        if not nomi:
+        """ID (raqam) yoki nomi bo'yicha ro'yxatdan izlaydi."""
+        if nomi is None or nomi == '':
             return None
-        nomi = str(nomi).strip().lower()
+        if isinstance(nomi, (int, float)):
+            return next((item for item in ro_yxat if item.id == int(nomi)), None)
+        s = str(nomi).strip()
+        if s.isdigit():
+            return next((item for item in ro_yxat if item.id == int(s)), None)
+        s = s.lower()
         for item in ro_yxat:
-            if item.nomi.strip().lower() == nomi:
+            if item.nomi.strip().lower() == s:
                 return item
         for item in ro_yxat:
-            if nomi in item.nomi.strip().lower():
+            if s in item.nomi.strip().lower():
                 return item
         return None
+
+    def kod_yoki_nomi(val, kod_map, nomi_map, default=''):
+        """ID (raqam) yoki nomi bo'yicha kod qiymatini qaytaradi (jinsi/holat/tarmoq uchun)."""
+        if val is None or val == '':
+            return default
+        if isinstance(val, (int, float)):
+            return kod_map.get(str(int(val)), default)
+        s = str(val).strip()
+        if s.isdigit():
+            return kod_map.get(s, default)
+        return nomi_map.get(s.lower(), default)
 
     created = 0
     errors  = []
@@ -2348,15 +2404,15 @@ def murojaat_import(request):
                 tuman_id=tuman.id,
                 mahalla_id=mahalla.id if mahalla else None,
                 fish=str(fish or '').strip(),
-                jinsi=JINSI_MAP.get(str(jinsi or '').strip().lower(), ''),
+                jinsi=kod_yoki_nomi(jinsi, JINSI_KOD, JINSI_MAP, ''),
                 telefon=str(telefon or '').strip(),
                 fabula=str(fabula or '').strip(),
                 zarar=zarar or None,
                 usul=usul,
                 kasb=kasb,
                 yosh=int(yosh) if yosh else None,
-                holat=HOLAT_MAP.get(str(holat or '').strip().lower(), 'yangi'),
-                ijtimoiy_tarmoq=TARMOQ_MAP.get(str(tarmoq or '').strip().lower(), ''),
+                holat=kod_yoki_nomi(holat, HOLAT_KOD, HOLAT_MAP, 'yangi'),
+                ijtimoiy_tarmoq=kod_yoki_nomi(tarmoq, TARMOQ_KOD, TARMOQ_MAP, ''),
                 kasb_izoh=str(kasb_izoh or '').strip(),
                 kasb_muassasa=str(kasb_muassasa or '').strip(),
                 kasb_kurs=int(kasb_kurs) if kasb_kurs else None,
