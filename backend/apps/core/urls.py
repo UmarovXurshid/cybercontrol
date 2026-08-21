@@ -83,6 +83,7 @@ urlpatterns = [
     path('murojaat/hisobot/excel/',  views.murojaat_hisobot_excel),
     path('murojaat/hisobot-tuman/',        views.murojaat_hisobot_tuman),
     path('murojaat/hisobot-tuman/excel/',  views.murojaat_hisobot_tuman_excel),
+    path('murojaat/fish-tekshir/',   views.murojaat_fish_tekshir),
     path('murojaat/',                views.murojaat_list_create),
     path('murojaat/<int:pk>/',       views.murojaat_detail),
 ]

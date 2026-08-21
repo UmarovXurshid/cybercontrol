@@ -407,6 +407,7 @@ export default function Murojaat() {
   const [loading,   setLoading]   = useState(false)
   const [filter,    setFilter]    = useState({ start: '', end: '', viloyat_id: '', tuman_id: '' })
   const [korishObj, setKorishObj] = useState(null)
+  const [fishMatch, setFishMatch] = useState({ topildi: false, natijalar: [] })
 
   useEffect(() => {
     if (role === 'respublika') api.get('/viloyatlar/').then(r => setViloyatlar(r.data.results || r.data))
@@ -444,6 +445,22 @@ export default function Murojaat() {
 
   const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }))
 
+  const checkFish = async (value) => {
+    const v = (value || '').trim()
+    if (v.length < 5) { setFishMatch({ topildi: false, natijalar: [] }); return }
+    try {
+      const params = new URLSearchParams({ fish: v })
+      if (editId) params.append('exclude_id', editId)
+      const { data } = await api.get(`/murojaat/fish-tekshir/?${params}`)
+      setFishMatch(data)
+      // Avval kiritilgan bo'lsa — avtomatik "Takroriy" deb belgilaymiz, lekin xodim buni pastda o'zgartira oladi
+      // (masalan fuqaro yana boshqa firibgarlik usuliga aldangan bo'lishi mumkin — bu haqiqatan yangi murojaat)
+      if (data.topildi) {
+        setForm(p => (p.holat === 'yangi' ? { ...p, holat: 'takroriy' } : p))
+      }
+    } catch { /* jim - tekshiruv ishlamasa ham forma ishlashda davom etadi */ }
+  }
+
   const save = async () => {
     if (!form.sana || !form.tuman) return toast.error('Sana va tuman majburiy')
     try {
@@ -454,7 +471,7 @@ export default function Murojaat() {
         await api.post('/murojaat/', form)
         toast.success('Saqlandi')
       }
-      setForm(EMPTY); setEditId(null); setFormVersion(v => v + 1)
+      setForm(EMPTY); setEditId(null); setFormVersion(v => v + 1); setFishMatch({ topildi: false, natijalar: [] })
       loadList()
     } catch (e) {
       toast.error(e?.response?.data?.detail || 'Xatolik')
@@ -471,6 +488,7 @@ export default function Murojaat() {
       kasb: m.kasb || '', kasb_izoh: m.kasb_izoh || '',
       kasb_muassasa: m.kasb_muassasa || '', kasb_kurs: m.kasb_kurs || ''
     })
+    setFishMatch({ topildi: false, natijalar: [] })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -521,9 +539,28 @@ export default function Murojaat() {
               disabled={!form.tuman}
             />
           </div>
-          <div>
+          <div className="md:col-span-2 lg:col-span-3">
             <label className="form-label">F.I.SH</label>
-            <input type="text" value={form.fish} onChange={set('fish')} className="input-field" placeholder="Familiya Ism Sharif"/>
+            <input type="text" value={form.fish} onChange={set('fish')} onBlur={e => checkFish(e.target.value)}
+              className="input-field" placeholder="Familiya Ism Sharif"/>
+            {fishMatch.topildi && (
+              <div className="mt-2 p-3 text-xs bg-amber-50 border border-amber-300 rounded-lg text-amber-800">
+                <div className="font-semibold mb-1">
+                  ⚠ Ushbu F.I.SH bo'yicha {fishMatch.natijalar.length} ta oldingi murojaat topildi — "Holat" avtomatik
+                  "Takroriy murojaat" qilib belgilandi. Agar bu fuqaro haqiqatda YANGI (masalan boshqa firibgarlik
+                  usuliga aldangan) bo'lsa, pastdagi "Holat" maydonidan "Yangi"ni qayta tanlang.
+                </div>
+                <ul className="space-y-1 list-disc list-inside">
+                  {fishMatch.natijalar.map(n => (
+                    <li key={n.id}>
+                      {n.sana} — {n.tuman_nomi}{n.mahalla_nomi ? ', ' + n.mahalla_nomi : ''}
+                      {n.usul_nomi ? ' — ' + n.usul_nomi : ''}
+                      {n.fabula ? `: "${n.fabula}"` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
           <div>
             <label className="form-label">Jinsi</label>
@@ -596,7 +633,7 @@ export default function Murojaat() {
             {editId ? '💾 Saqlash' : '➕ Qo\'shish'}
           </button>
           {editId && (
-            <button onClick={() => { setForm(EMPTY); setEditId(null); setFormVersion(v => v + 1) }}
+            <button onClick={() => { setForm(EMPTY); setEditId(null); setFormVersion(v => v + 1); setFishMatch({ topildi: false, natijalar: [] }) }}
               className="px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
               Bekor qilish
             </button>

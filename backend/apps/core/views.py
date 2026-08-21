@@ -357,7 +357,7 @@ def hisobot(request):
                (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s AND h.targibot_turi=2) AS online_qatnashchilar,
                (SELECT COUNT(*) FROM murojaat m WHERE m.mahalla_id=mahalla.id
-                AND m.sana BETWEEN %s AND %s) AS murojaat_soni
+                AND m.sana BETWEEN %s AND %s AND m.holat != 'takroriy') AS murojaat_soni
         FROM mahalla JOIN tuman ON mahalla.tuman_id=tuman.id
         WHERE 1=1{extra_where}
         ORDER BY tuman.id, mahalla.mahalla_nomi
@@ -473,7 +473,7 @@ def hisobot_tumanlar(request):
         SELECT tuman.tuman_nomi,
                (SELECT COUNT(*) FROM mahalla m WHERE m.tuman_id=tuman.id AND m.is_tuman=0) AS mahalla_soni,
                (SELECT COUNT(*) FROM murojaat mr JOIN mahalla m2 ON mr.mahalla_id=m2.id
-                WHERE m2.tuman_id=tuman.id AND mr.sana BETWEEN %s AND %s) AS murojaat_soni,
+                WHERE m2.tuman_id=tuman.id AND mr.sana BETWEEN %s AND %s AND mr.holat != 'takroriy') AS murojaat_soni,
                COALESCE(SUM(h.targibot_turi=1), 0)  AS offline_targibot_soni,
                COALESCE(SUM(CASE WHEN h.targibot_turi=1 THEN h.qatnashchilar_soni ELSE 0 END),0) AS offline_qatnashchilar,
                COALESCE(SUM(h.targibot_turi=2), 0)  AS online_targibot_soni,
@@ -2084,6 +2084,39 @@ def murojaat_kasblar(request):
     return Response(MurojaatKasbSerializer(MurojaatKasb.objects.all(), many=True).data)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def murojaat_fish_tekshir(request):
+    """F.I.SH bo'yicha avval kiritilgan murojaatlarni tekshiradi (takroriyni aniqlash uchun)."""
+    fish = (request.GET.get('fish') or '').strip()
+    if len(fish) < 5:
+        return Response({'topildi': False, 'natijalar': []})
+
+    exclude_id = request.GET.get('exclude_id')
+    vf = get_viloyat_qs_filter(request, 'viloyat_id')
+    qs = Murojaat.objects.filter(**vf).select_related('tuman', 'mahalla', 'usul')
+    if exclude_id:
+        qs = qs.exclude(pk=exclude_id)
+
+    natijalar = list(qs.filter(fish__iexact=fish))
+    if not natijalar:
+        natijalar = list(qs.filter(fish__icontains=fish))
+
+    data = [{
+        'id': m.id,
+        'sana': m.sana,
+        'fish': m.fish,
+        'telefon': m.telefon,
+        'holat': m.holat,
+        'usul_nomi': m.usul.nomi if m.usul_id else '',
+        'tuman_nomi': m.tuman.tuman_nomi if m.tuman_id else '',
+        'mahalla_nomi': m.mahalla.mahalla_nomi if m.mahalla_id else '',
+        'fabula': (m.fabula or '')[:200],
+    } for m in natijalar[:10]]
+
+    return Response({'topildi': len(data) > 0, 'natijalar': data})
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def murojaat_list_create(request):
@@ -2462,11 +2495,14 @@ def _hisobot_viloyatlar(request):
 def _build_hisobot_rows(start, end, v_ids, vf=None, group_field='viloyat_id'):
     """Barcha hisobot qatorlarini hisoblash (API va Excel uchun umumiy)"""
     today_str = date.today().isoformat()
-    P = Murojaat.objects.filter(sana__gte=start, sana__lte=end)
-    T = Murojaat.objects.filter(sana=today_str)
+    P_all = Murojaat.objects.filter(sana__gte=start, sana__lte=end)
+    T_all = Murojaat.objects.filter(sana=today_str)
     if vf:
-        P = P.filter(**vf)
-        T = T.filter(**vf)
+        P_all = P_all.filter(**vf)
+        T_all = T_all.filter(**vf)
+    # Takroriy (qayta tushgan) murojaatlar umumiy hisobga qo'shilmaydi
+    P = P_all.exclude(holat='takroriy')
+    T = T_all.exclude(holat='takroriy')
 
     def kf(ids):
         return lambda q: q.filter(kasb_id__in=ids)
@@ -2480,9 +2516,11 @@ def _build_hisobot_rows(start, end, v_ids, vf=None, group_field='viloyat_id'):
             return q
         return fn
 
-    def r(tartib, nomi, daraja, f):
+    def r(tartib, nomi, daraja, f, base_p=None, base_t=None):
+        bp = base_p if base_p is not None else P
+        bt = base_t if base_t is not None else T
         return {'tartib': tartib, 'nomi': nomi, 'daraja': daraja,
-                'jami': _cnt(f(P), v_ids, group_field), 'bugun': _cnt(f(T), v_ids, group_field)}
+                'jami': _cnt(f(bp), v_ids, group_field), 'bugun': _cnt(f(bt), v_ids, group_field)}
 
     af = lambda q: q
 
@@ -2514,7 +2552,7 @@ def _build_hisobot_rows(start, end, v_ids, vf=None, group_field='viloyat_id'):
         r('7',    'Нафақахўрлар',                                        1, kf([7])),
         r('8',    'Вақтинча ишсизлар',                                  1, kf([8])),
         r('9',    'Чет эл фуқаролари',                                  1, kf([9])),
-        r('10',   'Такрорий мурожатлар',                                1, hf('takroriy')),
+        r('10',   'Такрорий мурожатлар',                                1, hf('takroriy'), base_p=P_all, base_t=T_all),
         r('11',   'Фуқаронинг ўз айби билан',                           1, hf('aybi')),
         r('12',   'Тўғридан тўғри ариза қабул қилиниши',               1, hf('togri')),
 
@@ -3129,7 +3167,7 @@ def samaradorlik_hisobot(request):
                    (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h JOIN mahalla m ON h.mahalla_id=m.id
                     JOIN tuman t ON m.tuman_id=t.id
                     WHERE t.viloyat_id=v.id AND h.status=2 AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS qatnashchilar,
-                   (SELECT COUNT(*) FROM murojaat mr WHERE mr.viloyat_id=v.id AND mr.sana BETWEEN %s AND %s) AS murojaat_soni
+                   (SELECT COUNT(*) FROM murojaat mr WHERE mr.viloyat_id=v.id AND mr.sana BETWEEN %s AND %s AND mr.holat != 'takroriy') AS murojaat_soni
             FROM viloyat v ORDER BY v.nomi
         """
         params = [start, end] * 3
@@ -3141,7 +3179,7 @@ def samaradorlik_hisobot(request):
                     AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS targibot_soni,
                    (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                     AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS qatnashchilar,
-                   (SELECT COUNT(*) FROM murojaat m WHERE m.mahalla_id=mahalla.id AND m.sana BETWEEN %s AND %s) AS murojaat_soni
+                   (SELECT COUNT(*) FROM murojaat m WHERE m.mahalla_id=mahalla.id AND m.sana BETWEEN %s AND %s AND m.holat != 'takroriy') AS murojaat_soni
             FROM mahalla JOIN tuman ON mahalla.tuman_id=tuman.id
             WHERE tuman.viloyat_id=%s ORDER BY tuman.id, mahalla.mahalla_nomi
         """
@@ -3181,7 +3219,7 @@ def xavfli_mahallalar(request):
                    (SELECT COUNT(*) FROM hisobot h JOIN mahalla m ON h.mahalla_id=m.id
                     JOIN tuman t ON m.tuman_id=t.id
                     WHERE t.viloyat_id=v.id AND h.status=2 AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS targibot_soni,
-                   (SELECT COUNT(*) FROM murojaat mr WHERE mr.viloyat_id=v.id AND mr.sana BETWEEN %s AND %s) AS murojaat_soni
+                   (SELECT COUNT(*) FROM murojaat mr WHERE mr.viloyat_id=v.id AND mr.sana BETWEEN %s AND %s AND mr.holat != 'takroriy') AS murojaat_soni
             FROM viloyat v
             HAVING murojaat_soni > 0
             ORDER BY murojaat_soni DESC, targibot_soni ASC
@@ -3193,7 +3231,7 @@ def xavfli_mahallalar(request):
             SELECT mahalla.mahalla_nomi AS nomi, tuman.tuman_nomi,
                    (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                     AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS targibot_soni,
-                   (SELECT COUNT(*) FROM murojaat m WHERE m.mahalla_id=mahalla.id AND m.sana BETWEEN %s AND %s) AS murojaat_soni
+                   (SELECT COUNT(*) FROM murojaat m WHERE m.mahalla_id=mahalla.id AND m.sana BETWEEN %s AND %s AND m.holat != 'takroriy') AS murojaat_soni
             FROM mahalla JOIN tuman ON mahalla.tuman_id=tuman.id
             WHERE tuman.viloyat_id=%s
             HAVING murojaat_soni > 0
@@ -3247,7 +3285,7 @@ def oylik_dinamika(request):
             """
             murojaat_sql = """
                 SELECT MONTH(sana) AS oy, COUNT(*) AS soni
-                FROM murojaat WHERE viloyat_id=%s AND YEAR(sana)=%s
+                FROM murojaat WHERE viloyat_id=%s AND YEAR(sana)=%s AND holat != 'takroriy'
                 GROUP BY MONTH(sana)
             """
             t_params = [int(vid), int(yil)]
@@ -3261,7 +3299,7 @@ def oylik_dinamika(request):
             """
             murojaat_sql = """
                 SELECT MONTH(sana) AS oy, COUNT(*) AS soni
-                FROM murojaat WHERE YEAR(sana)=%s GROUP BY MONTH(sana)
+                FROM murojaat WHERE YEAR(sana)=%s AND holat != 'takroriy' GROUP BY MONTH(sana)
             """
             t_params = [int(yil)]
             m_params = [int(yil)]
@@ -3277,7 +3315,7 @@ def oylik_dinamika(request):
         """
         murojaat_sql = """
             SELECT MONTH(sana) AS oy, COUNT(*) AS soni
-            FROM murojaat WHERE viloyat_id=%s AND YEAR(sana)=%s
+            FROM murojaat WHERE viloyat_id=%s AND YEAR(sana)=%s AND holat != 'takroriy'
             GROUP BY MONTH(sana)
         """
         t_params = [vid, int(yil)]
@@ -3329,7 +3367,7 @@ def haftalik_holat(request):
             """
             murojaat_sql = """
                 SELECT YEARWEEK(sana, 1) AS hafta, COUNT(*) AS soni
-                FROM murojaat WHERE viloyat_id=%s AND sana >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
+                FROM murojaat WHERE viloyat_id=%s AND sana >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK) AND holat != 'takroriy'
                 GROUP BY YEARWEEK(sana, 1)
             """
             t_params = [int(vid)]
@@ -3346,7 +3384,7 @@ def haftalik_holat(request):
             """
             murojaat_sql = """
                 SELECT YEARWEEK(sana, 1) AS hafta, COUNT(*) AS soni
-                FROM murojaat WHERE sana >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
+                FROM murojaat WHERE sana >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK) AND holat != 'takroriy'
                 GROUP BY YEARWEEK(sana, 1)
             """
             t_params = []
@@ -3365,7 +3403,7 @@ def haftalik_holat(request):
         """
         murojaat_sql = """
             SELECT YEARWEEK(sana, 1) AS hafta, COUNT(*) AS soni
-            FROM murojaat WHERE viloyat_id=%s AND sana >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
+            FROM murojaat WHERE viloyat_id=%s AND sana >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK) AND holat != 'takroriy'
             GROUP BY YEARWEEK(sana, 1)
         """
         t_params = [vid]
