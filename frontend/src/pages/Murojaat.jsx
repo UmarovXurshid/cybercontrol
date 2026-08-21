@@ -546,9 +546,10 @@ export default function Murojaat() {
             {fishMatch.topildi && (
               <div className="mt-2 p-3 text-xs bg-amber-50 border border-amber-300 rounded-lg text-amber-800">
                 <div className="font-semibold mb-1">
-                  ⚠ Ushbu F.I.SH bo'yicha {fishMatch.natijalar.length} ta oldingi murojaat topildi — "Holat" avtomatik
-                  "Takroriy murojaat" qilib belgilandi. Agar bu fuqaro haqiqatda YANGI (masalan boshqa firibgarlik
-                  usuliga aldangan) bo'lsa, pastdagi "Holat" maydonidan "Yangi"ni qayta tanlang.
+                  ⚠ Ushbu F.I.SH ga o'xshash {fishMatch.natijalar.length} ta oldingi murojaat topildi (aynan bir xil
+                  yozilishi shart emas) — "Holat" avtomatik "Takroriy murojaat" qilib belgilandi. Agar bu fuqaro
+                  haqiqatda YANGI (masalan boshqa firibgarlik usuliga aldangan) bo'lsa yoki bu boshqa odam bo'lsa,
+                  pastdagi "Holat" maydonidan "Yangi"ni qayta tanlang.
                 </div>
                 <ul className="space-y-1 list-disc list-inside">
                   {fishMatch.natijalar.map(n => (

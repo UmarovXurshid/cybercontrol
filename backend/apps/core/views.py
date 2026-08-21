@@ -6,7 +6,8 @@ from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from datetime import date, datetime
-import os, io, requests, openpyxl
+import os, io, re, requests, openpyxl
+from difflib import SequenceMatcher
 from concurrent.futures import ThreadPoolExecutor
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.worksheet.datavalidation import DataValidation
@@ -2084,23 +2085,51 @@ def murojaat_kasblar(request):
     return Response(MurojaatKasbSerializer(MurojaatKasb.objects.all(), many=True).data)
 
 
+def _fish_normalize(s):
+    """F.I.SH ni solishtirish uchun tayyorlaydi: kichik harf, ortiqcha belgilar/probellar olib tashlanadi."""
+    s = (s or '').strip().lower()
+    s = re.sub(r'[^\w\s]', ' ', s, flags=re.UNICODE)
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def murojaat_fish_tekshir(request):
-    """F.I.SH bo'yicha avval kiritilgan murojaatlarni tekshiradi (takroriyni aniqlash uchun)."""
+    """
+    F.I.SH bo'yicha avval kiritilgan murojaatlarni tekshiradi (takroriyni aniqlash uchun).
+    Aynan bir xil yozilishi shart emas — o'xshashlik (fuzzy) bo'yicha qidiradi:
+    probel/katta-kichik harf farqi, so'zlar tartibi, kichik imlo xatolari e'tiborga olinmaydi.
+    """
     fish = (request.GET.get('fish') or '').strip()
     if len(fish) < 5:
         return Response({'topildi': False, 'natijalar': []})
 
     exclude_id = request.GET.get('exclude_id')
     vf = get_viloyat_qs_filter(request, 'viloyat_id')
-    qs = Murojaat.objects.filter(**vf).select_related('tuman', 'mahalla', 'usul')
+    qs = Murojaat.objects.filter(**vf).exclude(fish='').select_related('tuman', 'mahalla', 'usul')
     if exclude_id:
         qs = qs.exclude(pk=exclude_id)
 
-    natijalar = list(qs.filter(fish__iexact=fish))
-    if not natijalar:
-        natijalar = list(qs.filter(fish__icontains=fish))
+    norm_input    = _fish_normalize(fish)
+    input_tokens  = set(norm_input.split())
+
+    nomzodlar = []
+    for m in qs.only('id', 'sana', 'fish', 'telefon', 'holat', 'fabula',
+                      'tuman_id', 'mahalla_id', 'usul_id'):
+        norm_m = _fish_normalize(m.fish)
+        if not norm_m:
+            continue
+        m_tokens = set(norm_m.split())
+        umumiy   = input_tokens & m_tokens
+        oxshashlik = SequenceMatcher(None, norm_input, norm_m).ratio()
+        # Bir xil deb hisoblash mezoni: kamida 2 ta so'z mos kelsa (ism+familiya)
+        # YOKI umumiy matn o'xshashligi yuqori bo'lsa (imlo xatosi bo'lsa ham)
+        if norm_input == norm_m or len(umumiy) >= 2 or oxshashlik >= 0.82:
+            nomzodlar.append((oxshashlik, m))
+
+    nomzodlar.sort(key=lambda x: -x[0])
+    natijalar = [m for _, m in nomzodlar[:10]]
 
     data = [{
         'id': m.id,
@@ -2112,7 +2141,7 @@ def murojaat_fish_tekshir(request):
         'tuman_nomi': m.tuman.tuman_nomi if m.tuman_id else '',
         'mahalla_nomi': m.mahalla.mahalla_nomi if m.mahalla_id else '',
         'fabula': (m.fabula or '')[:200],
-    } for m in natijalar[:10]]
+    } for m in natijalar]
 
     return Response({'topildi': len(data) > 0, 'natijalar': data})
 
