@@ -231,12 +231,12 @@ function KasbSelector({ kasblar, value, onChange, izoh, onIzoh, muassasa, onMuas
       {finalKasb?.is_talaba && (
         <div className="grid grid-cols-2 gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
           <div>
-            <label className="form-label text-yellow-800">O'quv muassasasi *</label>
+            <label className="form-label text-yellow-800">O'quv muassasasi</label>
             <input type="text" value={muassasa} onChange={e => onMuassasa(e.target.value)}
               className="input-field" placeholder="Institut, litsey nomi..."/>
           </div>
           <div>
-            <label className="form-label text-yellow-800">Kurs *</label>
+            <label className="form-label text-yellow-800">Kurs</label>
             <select value={kurs} onChange={e => onKurs(e.target.value)} className="input-field">
               <option value="">— kurs —</option>
               {[1,2,3,4,5,6].map(k => <option key={k} value={k}>{k}-kurs</option>)}
@@ -492,11 +492,6 @@ export default function Murojaat() {
       if (form[k] === '' || form[k] === null || form[k] === undefined) {
         return toast.error(`"${label}" maydoni to'ldirilishi shart`)
       }
-    }
-    const tanlanganKasb = kasblar.find(k => k.id === Number(form.kasb))
-    if (tanlanganKasb?.is_talaba) {
-      if (!form.kasb_muassasa) return toast.error('"O\'quv muassasasi" maydoni to\'ldirilishi shart')
-      if (!form.kasb_kurs)     return toast.error('"Kurs" maydoni to\'ldirilishi shart')
     }
     try {
       if (editId) {

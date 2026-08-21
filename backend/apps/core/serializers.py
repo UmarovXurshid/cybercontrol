@@ -140,13 +140,6 @@ class MurojaatSerializer(serializers.ModelSerializer):
             if val in (None, ''):
                 xato[field] = 'Bu maydon to\'ldirilishi shart.'
 
-        kasb = attrs.get('kasb', getattr(self.instance, 'kasb', None) if self.instance else None)
-        if kasb and getattr(kasb, 'is_talaba', False):
-            for field in ('kasb_muassasa', 'kasb_kurs'):
-                val = attrs.get(field, getattr(self.instance, field, None) if self.instance else None)
-                if val in (None, ''):
-                    xato[field] = 'Bu maydon to\'ldirilishi shart.'
-
         if xato:
             raise serializers.ValidationError(xato)
         return attrs
