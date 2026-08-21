@@ -26,7 +26,10 @@ export default function RespublikaMurojaatHisobot() {
   const [end,    setEnd]    = useState(today)
   const [data,   setData]   = useState(null)
   const [loading,setLoading]= useState(false)
-  const [tab,    setTab]    = useState('table') // table | chart
+  const [tab,    setTab]    = useState('table') // table | chart | kunlik
+
+  const [kunlik,        setKunlik]        = useState(null)
+  const [kunlikLoading, setKunlikLoading] = useState(false)
 
   const load = async (s = start, e = end) => {
     setLoading(true)
@@ -37,7 +40,17 @@ export default function RespublikaMurojaatHisobot() {
     finally { setLoading(false) }
   }
 
+  const loadKunlik = async (s = start, e = end) => {
+    setKunlikLoading(true)
+    try {
+      const { data: d } = await api.get(`/murojaat/kunlik-holati/?start=${s}&end=${e}`)
+      setKunlik(d)
+    } catch { toast.error('Yuklab bo\'lmadi') }
+    finally { setKunlikLoading(false) }
+  }
+
   useEffect(() => { load() }, [])
+  useEffect(() => { if (tab === 'kunlik' && !kunlik) loadKunlik() }, [tab])
 
   const exportExcel = async () => {
     const token = localStorage.getItem('token')
@@ -107,7 +120,7 @@ export default function RespublikaMurojaatHisobot() {
           <label className="form-label">Oxiri</label>
           <input type="date" value={end} onChange={e => setEnd(e.target.value)} className="input-field w-40"/>
         </div>
-        <button onClick={() => load(start, end)} className="btn-primary">🔍 Ko'rsatish</button>
+        <button onClick={() => { load(start, end); if (tab === 'kunlik') loadKunlik(start, end) }} className="btn-primary">🔍 Ko'rsatish</button>
         <button onClick={exportExcel}
           className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-medium flex items-center gap-2">
           📥 Excel yuklab olish
@@ -144,8 +157,8 @@ export default function RespublikaMurojaatHisobot() {
 
           {/* ── Tab ── */}
           <div className="flex gap-2 mb-4">
-            {[['table','📋 Jadval'],['chart','📊 Grafiklar']].map(([key, label]) => (
-              <button key={key} onClick={() => setTab(key)}
+            {[['table','📋 Jadval'],['chart','📊 Grafiklar'],['kunlik','📅 Kunlik murojaatlar holati']].map(([key, label]) => (
+              <button key={key} onClick={() => { setTab(key); if (key === 'kunlik' && !kunlik) loadKunlik() }}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                   tab === key ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
                 {label}
@@ -335,6 +348,69 @@ export default function RespublikaMurojaatHisobot() {
                   })()}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ── KUNLIK MUROJAATLAR HOLATI ── */}
+          {tab === 'kunlik' && (
+            <div className="card overflow-hidden p-0">
+              {kunlikLoading && <div className="text-center py-20 text-gray-400">Yuklanmoqda...</div>}
+              {!kunlikLoading && kunlik && (
+                <>
+                  {kunlik.kesildimi && (
+                    <div className="m-4 p-3 text-xs bg-amber-50 border border-amber-300 rounded-lg text-amber-800">
+                      ⚠ Bu bo'lim faqat 1 oygacha (maks 31 kun) oraliqni ko'rsatadi. Tanlangan oraliq qisqartirildi:{' '}
+                      {kunlik.start} — {kunlik.end}
+                    </div>
+                  )}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr style={{ background: '#1F4E79' }}>
+                          <th className="sticky left-0 z-10 px-3 py-3 text-white text-left font-semibold border border-blue-900 min-w-[200px]"
+                              style={{ background: '#1F4E79' }}>Viloyat</th>
+                          {kunlik.sanalar.map(s => (
+                            <th key={s} className="px-2 py-3 text-white text-center font-semibold border border-blue-900 min-w-[70px]">
+                              {s.slice(8,10)}.{s.slice(5,7)}
+                            </th>
+                          ))}
+                          <th className="px-2 py-3 text-white text-center font-semibold border border-blue-900 min-w-[70px]">ЖАМИ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {kunlik.viloyatlar.map((v, idx) => {
+                          const row = kunlik.data[v.id] || {}
+                          const jami = kunlik.sanalar.reduce((sum, s) => sum + (row[s] || 0), 0)
+                          const bg = idx % 2 === 0 ? '#FFFFFF' : '#F2F2F2'
+                          return (
+                            <tr key={v.id} style={{ background: bg }}>
+                              <td className="sticky left-0 z-10 px-3 py-1.5 border border-gray-300 font-medium"
+                                  style={{ background: bg }}>
+                                {v.nomi}
+                              </td>
+                              {kunlik.sanalar.map(s => {
+                                const n = row[s] || 0
+                                return (
+                                  <td key={s} className="px-2 py-1.5 text-center border border-gray-300"
+                                      style={{ color: n === 0 ? '#c62828' : '#1b1b1b', fontWeight: n === 0 ? 700 : 400 }}>
+                                    {n === 0 ? '—' : n}
+                                  </td>
+                                )
+                              })}
+                              <td className="px-2 py-1.5 text-center border border-gray-300 font-semibold" style={{ background: '#DEEAF1' }}>
+                                {jami}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="p-3 text-xs text-gray-500">
+                    Qizil "—" belgisi — o'sha kuni o'sha viloyat murojaat kiritmaganini bildiradi.
+                  </div>
+                </>
+              )}
             </div>
           )}
         </>

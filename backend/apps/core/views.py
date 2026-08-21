@@ -5,7 +5,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import os, io, re, requests, openpyxl
 from difflib import SequenceMatcher
 from concurrent.futures import ThreadPoolExecutor
@@ -2641,6 +2641,51 @@ def murojaat_hisobot(request):
     vf = get_viloyat_qs_filter(request, 'viloyat_id')
     rows = _build_hisobot_rows(start, end, v_ids, vf)
     return Response({'viloyatlar': viloyatlar, 'rows': rows, 'start': start, 'end': end})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def murojaat_kunlik_holati(request):
+    """
+    Har bir viloyat kunlar kesimida qancha murojaat kiritganini ko'rsatadi
+    (kim kiritgan, kim kiritmagan — nazorat uchun). Maksimal 31 kunlik oraliq.
+    """
+    start = request.GET.get('start', date.today().replace(day=1).isoformat())
+    end   = request.GET.get('end',   date.today().isoformat())
+
+    d_start = datetime.strptime(start, '%Y-%m-%d').date()
+    d_end   = datetime.strptime(end,   '%Y-%m-%d').date()
+    kesildimi = False
+    if (d_end - d_start).days > 30:
+        d_end = d_start + timedelta(days=30)
+        end = d_end.isoformat()
+        kesildimi = True
+
+    viloyatlar = _hisobot_viloyatlar(request)
+    v_ids = [v['id'] for v in viloyatlar]
+    vf = get_viloyat_qs_filter(request, 'viloyat_id')
+
+    sanalar = []
+    d = d_start
+    while d <= d_end:
+        sanalar.append(d.isoformat())
+        d += timedelta(days=1)
+
+    qs = Murojaat.objects.filter(sana__gte=start, sana__lte=end, viloyat_id__in=v_ids, **vf) \
+                          .exclude(holat='takroriy') \
+                          .values('viloyat_id', 'sana').annotate(n=Count('id'))
+
+    data = {vid: {s: 0 for s in sanalar} for vid in v_ids}
+    for row in qs:
+        vid = row['viloyat_id']
+        s   = row['sana'].isoformat() if hasattr(row['sana'], 'isoformat') else row['sana']
+        if vid in data and s in data[vid]:
+            data[vid][s] = row['n']
+
+    return Response({
+        'viloyatlar': viloyatlar, 'sanalar': sanalar, 'data': data,
+        'start': start, 'end': end, 'kesildimi': kesildimi,
+    })
 
 
 def _hisobot_tumanlar(request):
