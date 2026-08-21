@@ -15,7 +15,7 @@ const TARMOQ_OPTIONS = [
 ]
 
 const EMPTY = {
-  sana: today, tuman: '', mahalla: '', fish: '', jinsi: '', telefon: '',
+  sana: today, tuman: '', mahalla: '', fish: '', jinsi: '', yosh: '', telefon: '',
   fabula: '', zarar: '', usul: '', holat: 'yangi', ijtimoiy_tarmoq: '',
   kasb: '', kasb_izoh: '', kasb_muassasa: '', kasb_kurs: ''
 }
@@ -453,10 +453,28 @@ export default function Murojaat() {
       if (editId) params.append('exclude_id', editId)
       const { data } = await api.get(`/murojaat/fish-tekshir/?${params}`)
       setFishMatch(data)
-      // Avval kiritilgan bo'lsa — avtomatik "Takroriy" deb belgilaymiz, lekin xodim buni pastda o'zgartira oladi
-      // (masalan fuqaro yana boshqa firibgarlik usuliga aldangan bo'lishi mumkin — bu haqiqatan yangi murojaat)
+      // Avval kiritilgan bo'lsa — avtomatik "Takroriy" deb belgilaymiz va o'sha murojaatchining
+      // boshqa barcha ma'lumotlarini (sanadan tashqari) avtomatik to'ldiramiz. Xodim buni pastda
+      // o'zgartira oladi (masalan fuqaro yana boshqa firibgarlik usuliga aldangan bo'lishi mumkin —
+      // bu haqiqatan yangi murojaat).
       if (data.topildi) {
-        setForm(p => (p.holat === 'yangi' ? { ...p, holat: 'takroriy' } : p))
+        const eng = data.natijalar[0]
+        setForm(p => ({
+          ...p,
+          holat: p.holat === 'yangi' ? 'takroriy' : p.holat,
+          jinsi: eng.jinsi || p.jinsi,
+          yosh: eng.yosh || p.yosh,
+          telefon: eng.telefon || p.telefon,
+          zarar: eng.zarar ?? p.zarar,
+          ijtimoiy_tarmoq: eng.ijtimoiy_tarmoq || p.ijtimoiy_tarmoq,
+          tuman: eng.tuman || p.tuman,
+          mahalla: eng.mahalla || p.mahalla,
+          usul: eng.usul || p.usul,
+          kasb: eng.kasb || p.kasb,
+          kasb_izoh: eng.kasb_izoh || p.kasb_izoh,
+          kasb_muassasa: eng.kasb_muassasa || p.kasb_muassasa,
+          kasb_kurs: eng.kasb_kurs || p.kasb_kurs,
+        }))
       }
     } catch { /* jim - tekshiruv ishlamasa ham forma ishlashda davom etadi */ }
   }
@@ -547,9 +565,15 @@ export default function Murojaat() {
               <div className="mt-2 p-3 text-xs bg-amber-50 border border-amber-300 rounded-lg text-amber-800">
                 <div className="font-semibold mb-1">
                   ⚠ Ushbu F.I.SH ga o'xshash {fishMatch.natijalar.length} ta oldingi murojaat topildi (aynan bir xil
-                  yozilishi shart emas) — "Holat" avtomatik "Takroriy murojaat" qilib belgilandi. Agar bu fuqaro
+                  yozilishi shart emas) — "Holat" avtomatik "Takroriy murojaat" qilib belgilandi va o'sha
+                  murojaatchining oldingi ma'lumotlari (sanadan tashqari) avtomatik to'ldirildi. Agar bu fuqaro
                   haqiqatda YANGI (masalan boshqa firibgarlik usuliga aldangan) bo'lsa yoki bu boshqa odam bo'lsa,
-                  pastdagi "Holat" maydonidan "Yangi"ni qayta tanlang.
+                  ma'lumotlarni tahrirlab, pastdagi "Holat" maydonidan "Yangi"ni qayta tanlang.
+                </div>
+                <div className="mb-2 p-2 bg-white/60 border border-amber-200 rounded">
+                  <span className="font-semibold">Oldin kiritilgan:</span> "{fishMatch.natijalar[0].fish}"
+                  {' '}→{' '}
+                  <span className="font-semibold">Hozir kiritilgan:</span> "{form.fish}"
                 </div>
                 <ul className="space-y-1 list-disc list-inside">
                   {fishMatch.natijalar.map(n => (

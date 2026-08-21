@@ -2107,7 +2107,7 @@ def murojaat_fish_tekshir(request):
 
     exclude_id = request.GET.get('exclude_id')
     vf = get_viloyat_qs_filter(request, 'viloyat_id')
-    qs = Murojaat.objects.filter(**vf).exclude(fish='').select_related('tuman', 'mahalla', 'usul')
+    qs = Murojaat.objects.filter(**vf).exclude(fish='').select_related('tuman', 'mahalla', 'usul', 'kasb')
     if exclude_id:
         qs = qs.exclude(pk=exclude_id)
 
@@ -2115,8 +2115,7 @@ def murojaat_fish_tekshir(request):
     input_tokens  = set(norm_input.split())
 
     nomzodlar = []
-    for m in qs.only('id', 'sana', 'fish', 'telefon', 'holat', 'fabula',
-                      'tuman_id', 'mahalla_id', 'usul_id'):
+    for m in qs:
         norm_m = _fish_normalize(m.fish)
         if not norm_m:
             continue
@@ -2135,9 +2134,21 @@ def murojaat_fish_tekshir(request):
         'id': m.id,
         'sana': m.sana,
         'fish': m.fish,
+        'jinsi': m.jinsi,
+        'yosh': m.yosh,
         'telefon': m.telefon,
         'holat': m.holat,
+        'zarar': m.zarar,
+        'ijtimoiy_tarmoq': m.ijtimoiy_tarmoq,
+        'tuman': m.tuman_id,
+        'mahalla': m.mahalla_id,
+        'usul': m.usul_id,
+        'kasb': m.kasb_id,
+        'kasb_izoh': m.kasb_izoh,
+        'kasb_muassasa': m.kasb_muassasa,
+        'kasb_kurs': m.kasb_kurs,
         'usul_nomi': m.usul.nomi if m.usul_id else '',
+        'kasb_nomi': m.kasb.nomi if m.kasb_id else '',
         'tuman_nomi': m.tuman.tuman_nomi if m.tuman_id else '',
         'mahalla_nomi': m.mahalla.mahalla_nomi if m.mahalla_id else '',
         'fabula': (m.fabula or '')[:200],
