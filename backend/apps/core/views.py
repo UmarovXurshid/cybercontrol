@@ -2643,11 +2643,9 @@ def murojaat_hisobot(request):
     return Response({'viloyatlar': viloyatlar, 'rows': rows, 'start': start, 'end': end})
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def murojaat_kunlik_holati(request):
+def _kunlik_holati_data(request):
     """
-    Har bir viloyat kunlar kesimida qancha murojaat kiritganini ko'rsatadi
+    Har bir viloyat kunlar kesimida qancha murojaat kiritganini hisoblaydi
     (kim kiritgan, kim kiritmagan — nazorat uchun). Maksimal 31 kunlik oraliq.
     """
     start = request.GET.get('start', date.today().replace(day=1).isoformat())
@@ -2682,10 +2680,112 @@ def murojaat_kunlik_holati(request):
         if vid in data and s in data[vid]:
             data[vid][s] = row['n']
 
-    return Response({
+    return {
         'viloyatlar': viloyatlar, 'sanalar': sanalar, 'data': data,
         'start': start, 'end': end, 'kesildimi': kesildimi,
-    })
+    }
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def murojaat_kunlik_holati(request):
+    return Response(_kunlik_holati_data(request))
+
+
+def _build_kunlik_holati_workbook(result):
+    """Kunlik murojaatlar holati uchun Excel workbook (viloyat x sana)."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    viloyatlar, sanalar, data = result['viloyatlar'], result['sanalar'], result['data']
+    start, end = result['start'], result['end']
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = end[:10]
+
+    thin   = Side(style='thin',   color='AAAAAA')
+    medium = Side(style='medium', color='1F4E79')
+    brd    = Border(left=thin, right=thin, top=thin, bottom=thin)
+    mbrd   = Border(left=medium, right=medium, top=medium, bottom=medium)
+    ctr    = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    lft    = Alignment(horizontal='left',   vertical='center', wrap_text=True)
+
+    def fill(hex_): return PatternFill('solid', start_color=hex_)
+    def fnt(bold=False, color='000000', size=9, italic=False):
+        return Font(name='Times New Roman', bold=bold, color=color, size=size, italic=italic)
+
+    DARK_BLUE = fill('1F4E79')
+    MID_BLUE  = fill('2E75B6')
+    RED_F     = fill('F8CBCB')
+    LT_BLUE   = fill('DEEAF1')
+
+    total_cols = 1 + len(sanalar) + 1  # Viloyat + sanalar + ЖАМИ
+
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
+    c = ws.cell(1, 1, f'KUNLIK MUROJAATLAR HOLATI   ({start} — {end})')
+    c.font = fnt(bold=True, color='FFFFFF', size=12)
+    c.fill = DARK_BLUE
+    c.alignment = ctr
+    c.border = mbrd
+    ws.row_dimensions[1].height = 30
+
+    col_names = ['Viloyat'] + [f'{s[8:10]}.{s[5:7]}' for s in sanalar] + ['ЖАМИ']
+    for ci, h in enumerate(col_names, 1):
+        c = ws.cell(2, ci, h)
+        c.font = fnt(bold=True, color='FFFFFF', size=9)
+        c.fill = MID_BLUE
+        c.alignment = ctr
+        c.border = brd
+    ws.row_dimensions[2].height = 20
+
+    ws.column_dimensions['A'].width = 26
+    for ci in range(len(sanalar)):
+        ws.column_dimensions[get_column_letter(2 + ci)].width = 8
+    ws.column_dimensions[get_column_letter(2 + len(sanalar))].width = 9
+
+    er = 3
+    for v in viloyatlar:
+        row = data.get(v['id'], {})
+        jami = sum(row.get(s, 0) or 0 for s in sanalar)
+
+        c = ws.cell(er, 1, v['nomi'])
+        c.font = fnt(bold=True); c.alignment = lft; c.border = brd
+
+        for ci, s in enumerate(sanalar):
+            n = row.get(s, 0) or 0
+            c = ws.cell(er, 2 + ci, n if n else '—')
+            c.alignment = ctr; c.border = brd
+            c.font = fnt(bold=(n == 0), color='C0392B' if n == 0 else '000000')
+            if n == 0:
+                c.fill = RED_F
+
+        c = ws.cell(er, 2 + len(sanalar), jami)
+        c.font = fnt(bold=True); c.fill = LT_BLUE; c.alignment = ctr; c.border = brd
+
+        ws.row_dimensions[er].height = 16
+        er += 1
+
+    ws.freeze_panes = 'B3'
+    return wb
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def murojaat_kunlik_holati_excel(request):
+    import io
+    result = _kunlik_holati_data(request)
+    wb = _build_kunlik_holati_workbook(result)
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f"murojaat_kunlik_holati_{result['start']}_{result['end']}.xlsx"
+    return HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="{fname}"'}
+    )
 
 
 def _hisobot_tumanlar(request):

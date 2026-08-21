@@ -66,6 +66,22 @@ export default function RespublikaMurojaatHisobot() {
     } catch { toast.error('Xatolik yuz berdi') }
   }
 
+  const exportKunlikExcel = async () => {
+    const token = localStorage.getItem('token')
+    const s = kunlik?.start || start
+    const e = kunlik?.end   || end
+    const url = `/api/murojaat/kunlik-holati/excel/?start=${s}&end=${e}`
+    try {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok) { toast.error('Excel yuklab olinmadi'); return }
+      const blob = await res.blob()
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `murojaat_kunlik_holati_${s}_${e}.xlsx`
+      link.click()
+    } catch { toast.error('Xatolik yuz berdi') }
+  }
+
   // Chart uchun ma'lumot — asosiy kategoriyalar jami
   const chartData = useMemo(() => {
     if (!data) return []
@@ -354,6 +370,14 @@ export default function RespublikaMurojaatHisobot() {
           {/* ── KUNLIK MUROJAATLAR HOLATI ── */}
           {tab === 'kunlik' && (
             <div className="card overflow-hidden p-0">
+              {!kunlikLoading && kunlik && (
+                <div className="flex justify-end p-4 pb-0">
+                  <button onClick={exportKunlikExcel}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-medium flex items-center gap-2">
+                    📥 Excel yuklab olish
+                  </button>
+                </div>
+              )}
               {kunlikLoading && <div className="text-center py-20 text-gray-400">Yuklanmoqda...</div>}
               {!kunlikLoading && kunlik && (
                 <>
