@@ -2122,9 +2122,11 @@ def murojaat_fish_tekshir(request):
         m_tokens = set(norm_m.split())
         umumiy   = input_tokens & m_tokens
         oxshashlik = SequenceMatcher(None, norm_input, norm_m).ratio()
-        # Bir xil deb hisoblash mezoni: kamida 2 ta so'z mos kelsa (ism+familiya)
-        # YOKI umumiy matn o'xshashligi yuqori bo'lsa (imlo xatosi bo'lsa ham)
-        if norm_input == norm_m or len(umumiy) >= 2 or oxshashlik >= 0.82:
+        # Bir xil deb hisoblash mezoni: F.I.Sh ning barcha 3 qismi (familiya+ism+otasining ismi)
+        # mos kelishi kerak — faqat ism+familiya bir xil bo'lgani bilan boshqa odam bo'lishi mumkin
+        # (masalan otasining ismi boshqa). Imlo xatosi bo'lsa ham matn juda o'xshash bo'lsa qabul qilinadi.
+        toliq_mos = len(input_tokens) >= 3 and len(m_tokens) >= 3 and len(umumiy) >= 3
+        if norm_input == norm_m or toliq_mos or oxshashlik >= 0.92:
             nomzodlar.append((oxshashlik, m))
 
     nomzodlar.sort(key=lambda x: -x[0])
