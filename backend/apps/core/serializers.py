@@ -130,6 +130,27 @@ class MurojaatSerializer(serializers.ModelSerializer):
                 mutable[field] = None
         return super().to_internal_value(mutable)
 
+    def validate(self, attrs):
+        # "Kasb bo'yicha izoh" (kasb_izoh) dan tashqari barcha maydonlar majburiy
+        majburiy = ['mahalla', 'fish', 'jinsi', 'yosh', 'telefon',
+                    'ijtimoiy_tarmoq', 'usul', 'zarar', 'kasb', 'fabula']
+        xato = {}
+        for field in majburiy:
+            val = attrs.get(field, getattr(self.instance, field, None) if self.instance else None)
+            if val in (None, ''):
+                xato[field] = 'Bu maydon to\'ldirilishi shart.'
+
+        kasb = attrs.get('kasb', getattr(self.instance, 'kasb', None) if self.instance else None)
+        if kasb and getattr(kasb, 'is_talaba', False):
+            for field in ('kasb_muassasa', 'kasb_kurs'):
+                val = attrs.get(field, getattr(self.instance, field, None) if self.instance else None)
+                if val in (None, ''):
+                    xato[field] = 'Bu maydon to\'ldirilishi shart.'
+
+        if xato:
+            raise serializers.ValidationError(xato)
+        return attrs
+
     class Meta:
         model  = Murojaat
         fields = '__all__'

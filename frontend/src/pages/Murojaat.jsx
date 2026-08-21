@@ -106,7 +106,7 @@ function UsulSelector({ usullar, value, onChange }) {
   return (
     <div className="space-y-2">
       <div>
-        <label className="form-label">Sodir etish usuli</label>
+        <label className="form-label">Sodir etish usuli *</label>
         <select value={sel1} onChange={e => pick1(e.target.value)} className="input-field">
           <option value="">— tanlang —</option>
           {level1.map(u => <option key={u.id} value={u.id}>{u.nomi}</option>)}
@@ -176,7 +176,7 @@ function KasbSelector({ kasblar, value, onChange, izoh, onIzoh, muassasa, onMuas
     <div className="space-y-3">
       {/* Level 1 */}
       <div>
-        <label className="form-label">Kasbi — toifasi</label>
+        <label className="form-label">Kasbi — toifasi *</label>
         <select value={sel1} onChange={e => pick1(e.target.value)} className="input-field">
           <option value="">— tanlang —</option>
           {level1.map(k => (
@@ -231,12 +231,12 @@ function KasbSelector({ kasblar, value, onChange, izoh, onIzoh, muassasa, onMuas
       {finalKasb?.is_talaba && (
         <div className="grid grid-cols-2 gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
           <div>
-            <label className="form-label text-yellow-800">O'quv muassasasi</label>
+            <label className="form-label text-yellow-800">O'quv muassasasi *</label>
             <input type="text" value={muassasa} onChange={e => onMuassasa(e.target.value)}
               className="input-field" placeholder="Institut, litsey nomi..."/>
           </div>
           <div>
-            <label className="form-label text-yellow-800">Kurs</label>
+            <label className="form-label text-yellow-800">Kurs *</label>
             <select value={kurs} onChange={e => onKurs(e.target.value)} className="input-field">
               <option value="">— kurs —</option>
               {[1,2,3,4,5,6].map(k => <option key={k} value={k}>{k}-kurs</option>)}
@@ -480,7 +480,24 @@ export default function Murojaat() {
   }
 
   const save = async () => {
-    if (!form.sana || !form.tuman) return toast.error('Sana va tuman majburiy')
+    // "Kasb bo'yicha izoh" dan tashqari barcha maydonlar majburiy
+    const majburiy = [
+      ['sana', 'Sana'], ['tuman', 'Tuman'], ['mahalla', 'Mahalla'],
+      ['fish', 'F.I.SH'], ['jinsi', 'Jinsi'], ['yosh', 'Yoshi'],
+      ['telefon', 'Telefon'], ['ijtimoiy_tarmoq', 'Ijtimoiy tarmoq'],
+      ['usul', 'Sodir etish usuli'], ['zarar', 'Zarar'], ['kasb', 'Kasbi'],
+      ['fabula', 'Fabula'],
+    ]
+    for (const [k, label] of majburiy) {
+      if (form[k] === '' || form[k] === null || form[k] === undefined) {
+        return toast.error(`"${label}" maydoni to'ldirilishi shart`)
+      }
+    }
+    const tanlanganKasb = kasblar.find(k => k.id === Number(form.kasb))
+    if (tanlanganKasb?.is_talaba) {
+      if (!form.kasb_muassasa) return toast.error('"O\'quv muassasasi" maydoni to\'ldirilishi shart')
+      if (!form.kasb_kurs)     return toast.error('"Kurs" maydoni to\'ldirilishi shart')
+    }
     try {
       if (editId) {
         await api.put(`/murojaat/${editId}/`, form)
@@ -492,7 +509,11 @@ export default function Murojaat() {
       setForm(EMPTY); setEditId(null); setFormVersion(v => v + 1); setFishMatch({ topildi: false, natijalar: [] })
       loadList()
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Xatolik')
+      const data = e?.response?.data
+      const birinchiXato = data && typeof data === 'object'
+        ? Object.values(data).flat().find(Boolean)
+        : null
+      toast.error(birinchiXato || data?.detail || 'Xatolik')
     }
   }
 
@@ -549,7 +570,7 @@ export default function Murojaat() {
             />
           </div>
           <div>
-            <label className="form-label">Mahalla</label>
+            <label className="form-label">Mahalla *</label>
             <SearchSelect
               options={mahallalar.map(m => ({ id: m.id, label: m.mahalla_nomi }))}
               value={form.mahalla}
@@ -558,7 +579,7 @@ export default function Murojaat() {
             />
           </div>
           <div className="md:col-span-2 lg:col-span-3">
-            <label className="form-label">F.I.SH</label>
+            <label className="form-label">F.I.SH *</label>
             <input type="text" value={form.fish} onChange={set('fish')} onBlur={e => checkFish(e.target.value)}
               className="input-field" placeholder="Familiya Ism Sharif"/>
             {fishMatch.topildi && (
@@ -588,19 +609,19 @@ export default function Murojaat() {
             )}
           </div>
           <div>
-            <label className="form-label">Jinsi</label>
+            <label className="form-label">Jinsi *</label>
             <select value={form.jinsi} onChange={set('jinsi')} className="input-field">
               <option value="">— tanlang —</option>
               {JINSI_OPTIONS.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
           <div>
-            <label className="form-label">Yoshi</label>
+            <label className="form-label">Yoshi *</label>
             <input type="number" min="1" max="120" value={form.yosh} onChange={set('yosh')}
               className="input-field" placeholder="Masalan: 35"/>
           </div>
           <div>
-            <label className="form-label">Telefon</label>
+            <label className="form-label">Telefon *</label>
             <input type="text" value={form.telefon} onChange={set('telefon')} className="input-field" placeholder="+998..."/>
           </div>
           <div>
@@ -610,7 +631,7 @@ export default function Murojaat() {
             </select>
           </div>
           <div>
-            <label className="form-label">Ijtimoiy tarmoq</label>
+            <label className="form-label">Ijtimoiy tarmoq *</label>
             <select value={form.ijtimoiy_tarmoq} onChange={set('ijtimoiy_tarmoq')} className="input-field">
               <option value="">— tanlang —</option>
               {TARMOQ_OPTIONS.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
@@ -625,7 +646,7 @@ export default function Murojaat() {
             />
           </div>
           <div>
-            <label className="form-label">Zarar (so'm)</label>
+            <label className="form-label">Zarar (so'm) *</label>
             <input type="number" value={form.zarar} onChange={set('zarar')} className="input-field" placeholder="0"/>
           </div>
         </div>
@@ -648,7 +669,7 @@ export default function Murojaat() {
 
         {/* Fabula */}
         <div className="mt-4">
-          <label className="form-label">Fabula (qisqacha mazmun)</label>
+          <label className="form-label">Fabula (qisqacha mazmun) *</label>
           <textarea value={form.fabula} onChange={set('fabula')} rows={3}
             className="input-field resize-none" placeholder="Voqeaning qisqacha bayoni..."/>
         </div>
