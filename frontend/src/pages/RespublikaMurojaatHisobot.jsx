@@ -399,12 +399,14 @@ export default function RespublikaMurojaatHisobot() {
                             </th>
                           ))}
                           <th className="px-2 py-3 text-white text-center font-semibold border border-blue-900 min-w-[70px]">ЖАМИ</th>
+                          <th className="px-2 py-3 text-white text-center font-semibold border border-blue-900 min-w-[80px]">Такрорий</th>
                         </tr>
                       </thead>
                       <tbody>
                         {kunlik.viloyatlar.map((v, idx) => {
                           const row = kunlik.data[v.id] || {}
                           const jami = kunlik.sanalar.reduce((sum, s) => sum + (row[s] || 0), 0)
+                          const takroriy = kunlik.takroriy?.[v.id] || 0
                           const bg = idx % 2 === 0 ? '#FFFFFF' : '#F2F2F2'
                           return (
                             <tr key={v.id} style={{ background: bg }}>
@@ -424,14 +426,18 @@ export default function RespublikaMurojaatHisobot() {
                               <td className="px-2 py-1.5 text-center border border-gray-300 font-semibold" style={{ background: '#DEEAF1' }}>
                                 {jami}
                               </td>
+                              <td className="px-2 py-1.5 text-center border border-gray-300 text-gray-400 italic">
+                                {takroriy}
+                              </td>
                             </tr>
                           )
                         })}
                       </tbody>
                     </table>
                   </div>
-                  <div className="p-3 text-xs text-gray-500">
-                    Qizil "—" belgisi — o'sha kuni o'sha viloyat murojaat kiritmaganini bildiradi.
+                  <div className="p-3 text-xs text-gray-500 space-y-1">
+                    <div>Qizil "—" belgisi — o'sha kuni o'sha viloyat murojaat kiritmaganini bildiradi.</div>
+                    <div>"ЖАМИ" ustuniga takroriy murojaatlar qo'shilmagan. "Такрорий" ustuni — shu davrda kiritilgan takroriy murojaatlar soni (alohida, umumiy hisobga kirmaydi).</div>
                   </div>
                 </>
               )}

@@ -2682,8 +2682,16 @@ def _kunlik_holati_data(request):
         if vid in data and s in data[vid]:
             data[vid][s] = row['n']
 
+    # Takroriy murojaatlar — jamiga qo'shilmaydi, alohida ustunda ko'rsatiladi
+    tq = Murojaat.objects.filter(sana__gte=start, sana__lte=end, viloyat_id__in=v_ids,
+                                  holat='takroriy', **vf) \
+                          .values('viloyat_id').annotate(n=Count('id'))
+    takroriy = {vid: 0 for vid in v_ids}
+    for row in tq:
+        takroriy[row['viloyat_id']] = row['n']
+
     return {
-        'viloyatlar': viloyatlar, 'sanalar': sanalar, 'data': data,
+        'viloyatlar': viloyatlar, 'sanalar': sanalar, 'data': data, 'takroriy': takroriy,
         'start': start, 'end': end, 'kesildimi': kesildimi,
     }
 
@@ -2701,6 +2709,7 @@ def _build_kunlik_holati_workbook(result):
     from openpyxl.utils import get_column_letter
 
     viloyatlar, sanalar, data = result['viloyatlar'], result['sanalar'], result['data']
+    takroriy = result.get('takroriy', {})
     start, end = result['start'], result['end']
 
     wb = Workbook()
@@ -2723,7 +2732,7 @@ def _build_kunlik_holati_workbook(result):
     RED_F     = fill('F8CBCB')
     LT_BLUE   = fill('DEEAF1')
 
-    total_cols = 1 + len(sanalar) + 1  # Viloyat + sanalar + ЖАМИ
+    total_cols = 1 + len(sanalar) + 1 + 1  # Viloyat + sanalar + ЖАМИ + Такрорий
 
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
     c = ws.cell(1, 1, f'KUNLIK MUROJAATLAR HOLATI   ({start} — {end})')
@@ -2733,7 +2742,7 @@ def _build_kunlik_holati_workbook(result):
     c.border = mbrd
     ws.row_dimensions[1].height = 30
 
-    col_names = ['Viloyat'] + [f'{s[8:10]}.{s[5:7]}' for s in sanalar] + ['ЖАМИ']
+    col_names = ['Viloyat'] + [f'{s[8:10]}.{s[5:7]}' for s in sanalar] + ['ЖАМИ', 'Такрорий']
     for ci, h in enumerate(col_names, 1):
         c = ws.cell(2, ci, h)
         c.font = fnt(bold=True, color='FFFFFF', size=9)
@@ -2746,6 +2755,7 @@ def _build_kunlik_holati_workbook(result):
     for ci in range(len(sanalar)):
         ws.column_dimensions[get_column_letter(2 + ci)].width = 8
     ws.column_dimensions[get_column_letter(2 + len(sanalar))].width = 9
+    ws.column_dimensions[get_column_letter(3 + len(sanalar))].width = 10
 
     er = 3
     for v in viloyatlar:
@@ -2765,6 +2775,9 @@ def _build_kunlik_holati_workbook(result):
 
         c = ws.cell(er, 2 + len(sanalar), jami)
         c.font = fnt(bold=True); c.fill = LT_BLUE; c.alignment = ctr; c.border = brd
+
+        c = ws.cell(er, 3 + len(sanalar), takroriy.get(v['id'], 0) or 0)
+        c.font = fnt(italic=True, color='888888'); c.alignment = ctr; c.border = brd
 
         ws.row_dimensions[er].height = 16
         er += 1
