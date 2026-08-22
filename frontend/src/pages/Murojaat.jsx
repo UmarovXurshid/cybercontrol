@@ -408,6 +408,9 @@ export default function Murojaat() {
   const [filter,    setFilter]    = useState({ start: '', end: '', viloyat_id: '', tuman_id: '' })
   const [korishObj, setKorishObj] = useState(null)
   const [fishMatch, setFishMatch] = useState({ topildi: false, natijalar: [] })
+  const [page,      setPage]      = useState(1)
+  const [jamiSoni,  setJamiSoni]  = useState(0)
+  const PAGE_SIZE = 500
 
   useEffect(() => {
     if (role === 'respublika') api.get('/viloyatlar/').then(r => setViloyatlar(r.data.results || r.data))
@@ -429,7 +432,7 @@ export default function Murojaat() {
     }
   }, [form.tuman])
 
-  const loadList = async (f = filter) => {
+  const loadList = async (f = filter, p = 1) => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
@@ -437,8 +440,12 @@ export default function Murojaat() {
       if (f.end)        params.append('end', f.end)
       if (f.viloyat_id) params.append('viloyat_id', f.viloyat_id)
       if (f.tuman_id)   params.append('tuman_id', f.tuman_id)
+      params.append('page', p)
+      params.append('page_size', PAGE_SIZE)
       const { data } = await api.get(`/murojaat/?${params}`)
-      setMurojaatlar(data)
+      setMurojaatlar(data.results || [])
+      setJamiSoni(data.count ?? (data.results ? data.results.length : 0))
+      setPage(p)
     } catch { toast.error('Yuklab bo\'lmadi') }
     finally { setLoading(false) }
   }
@@ -502,7 +509,7 @@ export default function Murojaat() {
         toast.success('Saqlandi')
       }
       setForm(EMPTY); setEditId(null); setFormVersion(v => v + 1); setFishMatch({ topildi: false, natijalar: [] })
-      loadList()
+      loadList(filter, page)
     } catch (e) {
       const data = e?.response?.data
       const birinchiXato = data && typeof data === 'object'
@@ -530,7 +537,7 @@ export default function Murojaat() {
     if (!confirm('O\'chirilsinmi?')) return
     await api.delete(`/murojaat/${id}/`)
     toast.success('O\'chirildi')
-    loadList()
+    loadList(filter, page)
   }
 
   // Kasb nomini topish (jadval uchun)
@@ -712,8 +719,8 @@ export default function Murojaat() {
             {filterTumanlar.map(t => <option key={t.id} value={t.id}>{t.tuman_nomi}</option>)}
           </select>
         </div>
-        <button onClick={() => loadList(filter)} className="btn-primary">🔍 Qidirish</button>
-        <button onClick={() => { const f = { start:'', end:'', viloyat_id:'', tuman_id:'' }; setFilter(f); loadList(f) }}
+        <button onClick={() => loadList(filter, 1)} className="btn-primary">🔍 Qidirish</button>
+        <button onClick={() => { const f = { start:'', end:'', viloyat_id:'', tuman_id:'' }; setFilter(f); loadList(f, 1) }}
           className="px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
           ✕ Tozalash
         </button>
@@ -796,8 +803,27 @@ export default function Murojaat() {
               </tbody>
             </table>
           </div>
-          <div className="px-4 py-2 bg-gray-50 text-xs text-gray-500 border-t border-gray-200">
-            Jami: {murojaatlar.length} ta murojaat
+          <div className="px-4 py-2 bg-gray-50 text-xs text-gray-500 border-t border-gray-200 flex items-center justify-between flex-wrap gap-2">
+            <span>Jami: {jamiSoni} ta murojaat{jamiSoni > PAGE_SIZE ? ` (${page}-sahifa, ${murojaatlar.length} ta ko'rsatilmoqda)` : ''}</span>
+            {jamiSoni > PAGE_SIZE && (
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => loadList(filter, page - 1)}
+                  className="px-3 py-1 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ← Oldingi
+                </button>
+                <span>{page} / {Math.ceil(jamiSoni / PAGE_SIZE)}</span>
+                <button
+                  disabled={page >= Math.ceil(jamiSoni / PAGE_SIZE)}
+                  onClick={() => loadList(filter, page + 1)}
+                  className="px-3 py-1 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Keyingi →
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

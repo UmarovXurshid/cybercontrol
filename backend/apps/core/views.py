@@ -2178,7 +2178,23 @@ def murojaat_list_create(request):
             qs = qs.filter(viloyat_id=viloyat)
         if tuman:
             qs = qs.filter(tuman_id=tuman)
-        return Response(MurojaatSerializer(qs[:500], many=True).data)
+
+        qs = qs.order_by('-sana', '-id')
+        jami = qs.count()
+        try:
+            page      = max(1, int(request.GET.get('page', 1)))
+            page_size = min(500, max(1, int(request.GET.get('page_size', 500))))
+        except (TypeError, ValueError):
+            page, page_size = 1, 500
+        boshi = (page - 1) * page_size
+        oxiri = boshi + page_size
+
+        return Response({
+            'count':     jami,
+            'page':      page,
+            'page_size': page_size,
+            'results':   MurojaatSerializer(qs[boshi:oxiri], many=True).data,
+        })
 
     # POST — yangi murojaat qo'shish
     data = request.data.copy()
