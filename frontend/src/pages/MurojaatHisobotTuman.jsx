@@ -21,7 +21,10 @@ export default function MurojaatHisobotTuman() {
   const [tumanlarList, setTumanlarList] = useState([])
   const [data,   setData]   = useState(null)
   const [loading,setLoading]= useState(false)
-  const [tab,    setTab]    = useState('table') // table | chart
+  const [tab,    setTab]    = useState('table') // table | chart | kunlik
+
+  const [kunlik,        setKunlik]        = useState(null)
+  const [kunlikLoading, setKunlikLoading] = useState(false)
 
   useEffect(() => {
     api.get('/tumanlar/').then(r => setTumanlarList(r.data.results || r.data))
@@ -37,7 +40,24 @@ export default function MurojaatHisobotTuman() {
     finally { setLoading(false) }
   }
 
+  const loadKunlik = async (s = start, e = end, t = tuman) => {
+    setKunlikLoading(true)
+    try {
+      const q = `/murojaat/kunlik-holati-tuman/?start=${s}&end=${e}${t ? `&tuman=${t}` : ''}`
+      const { data: d } = await api.get(q)
+      setKunlik(d)
+    } catch { toast.error('Yuklab bo\'lmadi') }
+    finally { setKunlikLoading(false) }
+  }
+
   useEffect(() => { load() }, [])
+  useEffect(() => { if (tab === 'kunlik' && !kunlik) loadKunlik() }, [tab])
+
+  const applyFilter = () => {
+    load(start, end, tuman)
+    setKunlik(null)
+    if (tab === 'kunlik') loadKunlik(start, end, tuman)
+  }
 
   const exportExcel = async () => {
     const token = localStorage.getItem('token')
@@ -49,6 +69,22 @@ export default function MurojaatHisobotTuman() {
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       link.download = `murojaat_hisobot_tuman_${start}_${end}.xlsx`
+      link.click()
+    } catch { toast.error('Xatolik yuz berdi') }
+  }
+
+  const exportKunlikExcel = async () => {
+    const token = localStorage.getItem('token')
+    const s = kunlik?.start || start
+    const e = kunlik?.end   || end
+    const url = `/api/murojaat/kunlik-holati-tuman/excel/?start=${s}&end=${e}${tuman ? `&tuman=${tuman}` : ''}`
+    try {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok) { toast.error('Excel yuklab olinmadi'); return }
+      const blob = await res.blob()
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `murojaat_kunlik_holati_tuman_${s}_${e}.xlsx`
       link.click()
     } catch { toast.error('Xatolik yuz berdi') }
   }
@@ -114,7 +150,7 @@ export default function MurojaatHisobotTuman() {
             {tumanlarList.map(t => <option key={t.id} value={t.id}>{t.tuman_nomi}</option>)}
           </select>
         </div>
-        <button onClick={() => load(start, end, tuman)} className="btn-primary">🔍 Ko'rsatish</button>
+        <button onClick={applyFilter} className="btn-primary">🔍 Ko'rsatish</button>
         <button onClick={exportExcel}
           className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-medium flex items-center gap-2">
           📥 Excel yuklab olish
@@ -151,8 +187,8 @@ export default function MurojaatHisobotTuman() {
 
           {/* ── Tab ── */}
           <div className="flex gap-2 mb-4">
-            {[['table','📋 Jadval'],['chart','📊 Grafiklar']].map(([key, label]) => (
-              <button key={key} onClick={() => setTab(key)}
+            {[['table','📋 Jadval'],['chart','📊 Grafiklar'],['kunlik','📅 Kunlik murojaatlar holati']].map(([key, label]) => (
+              <button key={key} onClick={() => { setTab(key); if (key === 'kunlik' && !kunlik) loadKunlik() }}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                   tab === key ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
                 {label}
@@ -338,6 +374,83 @@ export default function MurojaatHisobotTuman() {
                   })()}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ── KUNLIK MUROJAATLAR HOLATI ── */}
+          {tab === 'kunlik' && (
+            <div className="card overflow-hidden p-0">
+              {!kunlikLoading && kunlik && (
+                <div className="flex justify-end p-4 pb-0">
+                  <button onClick={exportKunlikExcel}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-medium flex items-center gap-2">
+                    📥 Excel yuklab olish
+                  </button>
+                </div>
+              )}
+              {kunlikLoading && <div className="text-center py-20 text-gray-400">Yuklanmoqda...</div>}
+              {!kunlikLoading && kunlik && (
+                <>
+                  {kunlik.kesildimi && (
+                    <div className="m-4 p-3 text-xs bg-amber-50 border border-amber-300 rounded-lg text-amber-800">
+                      ⚠ Bu bo'lim faqat 1 oygacha (maks 31 kun) oraliqni ko'rsatadi. Tanlangan oraliq qisqartirildi:{' '}
+                      {kunlik.start} — {kunlik.end}
+                    </div>
+                  )}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr style={{ background: '#1F4E79' }}>
+                          <th className="sticky left-0 z-10 px-3 py-3 text-white text-left font-semibold border border-blue-900 min-w-[200px]"
+                              style={{ background: '#1F4E79' }}>Tuman</th>
+                          {kunlik.sanalar.map(s => (
+                            <th key={s} className="px-2 py-3 text-white text-center font-semibold border border-blue-900 min-w-[70px]">
+                              {s.slice(8,10)}.{s.slice(5,7)}
+                            </th>
+                          ))}
+                          <th className="px-2 py-3 text-white text-center font-semibold border border-blue-900 min-w-[70px]">ЖАМИ</th>
+                          <th className="px-2 py-3 text-white text-center font-semibold border border-blue-900 min-w-[80px]">Такрорий</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {kunlik.tumanlar.map((t, idx) => {
+                          const row = kunlik.data[t.id] || {}
+                          const jami = kunlik.sanalar.reduce((sum, s) => sum + (row[s] || 0), 0)
+                          const takroriy = kunlik.takroriy?.[t.id] || 0
+                          const bg = idx % 2 === 0 ? '#FFFFFF' : '#F2F2F2'
+                          return (
+                            <tr key={t.id} style={{ background: bg }}>
+                              <td className="sticky left-0 z-10 px-3 py-1.5 border border-gray-300 font-medium"
+                                  style={{ background: bg }}>
+                                {t.nomi}
+                              </td>
+                              {kunlik.sanalar.map(s => {
+                                const n = row[s] || 0
+                                return (
+                                  <td key={s} className="px-2 py-1.5 text-center border border-gray-300"
+                                      style={{ color: n === 0 ? '#c62828' : '#1b1b1b', fontWeight: n === 0 ? 700 : 400 }}>
+                                    {n === 0 ? '—' : n}
+                                  </td>
+                                )
+                              })}
+                              <td className="px-2 py-1.5 text-center border border-gray-300 font-semibold" style={{ background: '#DEEAF1' }}>
+                                {jami}
+                              </td>
+                              <td className="px-2 py-1.5 text-center border border-gray-300 text-gray-400 italic">
+                                {takroriy}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="p-3 text-xs text-gray-500 space-y-1">
+                    <div>Qizil "—" belgisi — o'sha kuni o'sha tuman murojaat kiritmaganini bildiradi.</div>
+                    <div>"ЖАМИ" ustuniga takroriy murojaatlar qo'shilmagan. "Такрорий" ustuni — shu davrda kiritilgan takroriy murojaatlar soni (alohida, umumiy hisobga kirmaydi).</div>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </>

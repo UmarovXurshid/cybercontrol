@@ -85,6 +85,8 @@ urlpatterns = [
     path('murojaat/kunlik-holati/excel/',  views.murojaat_kunlik_holati_excel),
     path('murojaat/hisobot-tuman/',        views.murojaat_hisobot_tuman),
     path('murojaat/hisobot-tuman/excel/',  views.murojaat_hisobot_tuman_excel),
+    path('murojaat/kunlik-holati-tuman/',        views.murojaat_kunlik_holati_tuman),
+    path('murojaat/kunlik-holati-tuman/excel/',  views.murojaat_kunlik_holati_tuman_excel),
     path('murojaat/fish-tekshir/',   views.murojaat_fish_tekshir),
     path('murojaat/',                views.murojaat_list_create),
     path('murojaat/<int:pk>/',       views.murojaat_detail),

@@ -33,28 +33,46 @@ export default function RespublikaMurojaatHisobot() {
 
   const [viloyatlarRoyxati, setViloyatlarRoyxati] = useState([])
   const [viloyatFilter,     setViloyatFilter]     = useState('')
+  const [tumanlarRoyxati,   setTumanlarRoyxati]   = useState([])
+  const [tumanFilter,       setTumanFilter]       = useState('')
 
   useEffect(() => {
     api.get('/viloyatlar/').then(r => setViloyatlarRoyxati(r.data.results || r.data)).catch(() => {})
   }, [])
 
-  const load = async (s = start, e = end, v = viloyatFilter) => {
+  useEffect(() => {
+    setTumanFilter('')
+    if (!viloyatFilter) { setTumanlarRoyxati([]); return }
+    api.get(`/tumanlar/?viloyat=${viloyatFilter}`).then(r => setTumanlarRoyxati(r.data.results || r.data)).catch(() => {})
+  }, [viloyatFilter])
+
+  const load = async (s = start, e = end, v = viloyatFilter, t = tumanFilter) => {
     setLoading(true)
     try {
       const params = new URLSearchParams({ start: s, end: e })
-      if (v) params.append('viloyat', v)
-      const { data: d } = await api.get(`/murojaat/hisobot/?${params}`)
+      let url = '/murojaat/hisobot/'
+      if (v) {
+        url = '/murojaat/hisobot-tuman/'
+        params.append('viloyat', v)
+        if (t) params.append('tuman', t)
+      }
+      const { data: d } = await api.get(`${url}?${params}`)
       setData(d)
     } catch { toast.error('Yuklab bo\'lmadi') }
     finally { setLoading(false) }
   }
 
-  const loadKunlik = async (s = start, e = end, v = viloyatFilter) => {
+  const loadKunlik = async (s = start, e = end, v = viloyatFilter, t = tumanFilter) => {
     setKunlikLoading(true)
     try {
       const params = new URLSearchParams({ start: s, end: e })
-      if (v) params.append('viloyat', v)
-      const { data: d } = await api.get(`/murojaat/kunlik-holati/?${params}`)
+      let url = '/murojaat/kunlik-holati/'
+      if (v) {
+        url = '/murojaat/kunlik-holati-tuman/'
+        params.append('viloyat', v)
+        if (t) params.append('tuman', t)
+      }
+      const { data: d } = await api.get(`${url}?${params}`)
       setKunlik(d)
     } catch { toast.error('Yuklab bo\'lmadi') }
     finally { setKunlikLoading(false) }
@@ -64,18 +82,22 @@ export default function RespublikaMurojaatHisobot() {
   useEffect(() => { if (tab === 'kunlik' && !kunlik) loadKunlik() }, [tab])
 
   const applyFilter = () => {
-    load(start, end, viloyatFilter)
+    load(start, end, viloyatFilter, tumanFilter)
     setKunlik(null)
-    if (tab === 'kunlik') loadKunlik(start, end, viloyatFilter)
+    if (tab === 'kunlik') loadKunlik(start, end, viloyatFilter, tumanFilter)
   }
 
   const exportExcel = async () => {
     const token = localStorage.getItem('token')
     const params = new URLSearchParams({ start, end })
-    if (viloyatFilter) params.append('viloyat', viloyatFilter)
-    const url = `/api/murojaat/hisobot/excel/?${params}`
+    let url = '/api/murojaat/hisobot/excel/'
+    if (viloyatFilter) {
+      url = '/api/murojaat/hisobot-tuman/excel/'
+      params.append('viloyat', viloyatFilter)
+      if (tumanFilter) params.append('tuman', tumanFilter)
+    }
     try {
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const res = await fetch(`${url}?${params}`, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) { toast.error('Excel yuklab olinmadi'); return }
       const blob = await res.blob()
       const link = document.createElement('a')
@@ -90,10 +112,14 @@ export default function RespublikaMurojaatHisobot() {
     const s = kunlik?.start || start
     const e = kunlik?.end   || end
     const params = new URLSearchParams({ start: s, end: e })
-    if (viloyatFilter) params.append('viloyat', viloyatFilter)
-    const url = `/api/murojaat/kunlik-holati/excel/?${params}`
+    let url = '/api/murojaat/kunlik-holati/excel/'
+    if (viloyatFilter) {
+      url = '/api/murojaat/kunlik-holati-tuman/excel/'
+      params.append('viloyat', viloyatFilter)
+      if (tumanFilter) params.append('tuman', tumanFilter)
+    }
     try {
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const res = await fetch(`${url}?${params}`, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) { toast.error('Excel yuklab olinmadi'); return }
       const blob = await res.blob()
       const link = document.createElement('a')
@@ -117,11 +143,13 @@ export default function RespublikaMurojaatHisobot() {
     })).filter(d => d.jami > 0)
   }, [data])
 
+  const groups = data ? (data.tumanlar || data.viloyatlar || []) : []
+
   const viloyatChartData = useMemo(() => {
     if (!data) return []
     const jamiRow = data.rows.find(r => r.tartib === 'ЖАМИ' && !r.section)
     if (!jamiRow) return []
-    return data.viloyatlar.map(v => ({
+    return groups.map(v => ({
       name: v.nomi.replace(' viloyati', '').replace(' viloayti', ''),
       jami: jamiRow.jami?.[v.id] || 0
     })).filter(d => d.jami > 0)
@@ -140,8 +168,6 @@ export default function RespublikaMurojaatHisobot() {
       .filter(d => d.jami > 0)
       .slice(0, 10)
   }, [data])
-
-  const viloyatlar = data?.viloyatlar || []
 
   return (
     <div>
@@ -164,6 +190,15 @@ export default function RespublikaMurojaatHisobot() {
             {viloyatlarRoyxati.map(v => <option key={v.id} value={v.id}>{v.nomi}</option>)}
           </select>
         </div>
+        {viloyatFilter && (
+          <div>
+            <label className="form-label">Tuman</label>
+            <select value={tumanFilter} onChange={e => setTumanFilter(e.target.value)} className="input-field w-48">
+              <option value="">Barcha tumanlar</option>
+              {tumanlarRoyxati.map(t => <option key={t.id} value={t.id}>{t.tuman_nomi || t.nomi}</option>)}
+            </select>
+          </div>
+        )}
         <button onClick={applyFilter} className="btn-primary">🔍 Ko'rsatish</button>
         <button onClick={exportExcel}
           className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-medium flex items-center gap-2">
@@ -222,7 +257,7 @@ export default function RespublikaMurojaatHisobot() {
                       <th className="sticky left-10 z-10 px-3 py-3 text-white text-left font-semibold border border-blue-900 min-w-[300px]"
                           style={{ background: '#1F4E79' }}>Кўрсаткичлар</th>
                       <th className="px-2 py-3 text-white text-center font-semibold border border-blue-900 w-14">ЖАМИ</th>
-                      {viloyatlar.map(v => (
+                      {groups.map(v => (
                         <th key={v.id}
                           className="px-2 py-3 text-white text-center font-semibold border border-blue-900 min-w-[90px]">
                           {v.nomi.replace(' viloyati','').replace(' viloayti','')}
@@ -235,7 +270,7 @@ export default function RespublikaMurojaatHisobot() {
                       // SECTION sarlavhasi
                       if (row.section) return (
                         <tr key={i}>
-                          <td colSpan={3 + viloyatlar.length}
+                          <td colSpan={3 + groups.length}
                             className="px-3 py-2 text-center font-bold text-white text-xs border"
                             style={{ background: '#1F4E79', fontSize: '11px' }}>
                             {row.section}
@@ -265,7 +300,7 @@ export default function RespublikaMurojaatHisobot() {
                                 style={{ background: bg, color: fg, fontWeight: fw }}>
                               {row.jami?.total || ''}
                             </td>
-                            {viloyatlar.map(v => (
+                            {groups.map(v => (
                               <td key={v.id} className="px-2 py-1.5 text-center border border-gray-300"
                                   style={{ color: fg }}>
                                 {row.jami?.[v.id] || ''}
@@ -284,10 +319,12 @@ export default function RespublikaMurojaatHisobot() {
           {/* ── GRAFIKLAR ── */}
           {tab === 'chart' && (
             <div className="space-y-6">
-              {/* Viloyatlar bo'yicha */}
+              {/* Viloyatlar/tumanlar bo'yicha */}
               {viloyatChartData.length > 0 && (
                 <div className="card">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-4">Viloyatlar bo'yicha jami murojaatlar</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-4">
+                    {viloyatFilter ? "Tumanlar bo'yicha jami murojaatlar" : "Viloyatlar bo'yicha jami murojaatlar"}
+                  </h3>
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={viloyatChartData} margin={{ top: 5, right: 20, bottom: 60, left: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0"/>
@@ -420,7 +457,7 @@ export default function RespublikaMurojaatHisobot() {
                       <thead>
                         <tr style={{ background: '#1F4E79' }}>
                           <th className="sticky left-0 z-10 px-3 py-3 text-white text-left font-semibold border border-blue-900 min-w-[200px]"
-                              style={{ background: '#1F4E79' }}>Viloyat</th>
+                              style={{ background: '#1F4E79' }}>{kunlik.tumanlar ? 'Tuman' : 'Viloyat'}</th>
                           {kunlik.sanalar.map(s => (
                             <th key={s} className="px-2 py-3 text-white text-center font-semibold border border-blue-900 min-w-[70px]">
                               {s.slice(8,10)}.{s.slice(5,7)}
@@ -431,7 +468,7 @@ export default function RespublikaMurojaatHisobot() {
                         </tr>
                       </thead>
                       <tbody>
-                        {kunlik.viloyatlar.map((v, idx) => {
+                        {(kunlik.tumanlar || kunlik.viloyatlar).map((v, idx) => {
                           const row = kunlik.data[v.id] || {}
                           const jami = kunlik.sanalar.reduce((sum, s) => sum + (row[s] || 0), 0)
                           const takroriy = kunlik.takroriy?.[v.id] || 0

@@ -2661,14 +2661,8 @@ def murojaat_hisobot(request):
     return Response({'viloyatlar': viloyatlar, 'rows': rows, 'start': start, 'end': end})
 
 
-def _kunlik_holati_data(request):
-    """
-    Har bir viloyat kunlar kesimida qancha murojaat kiritganini hisoblaydi
-    (kim kiritgan, kim kiritmagan — nazorat uchun). Maksimal 31 kunlik oraliq.
-    """
-    start = request.GET.get('start', date.today().replace(day=1).isoformat())
-    end   = request.GET.get('end',   date.today().isoformat())
-
+def _compute_kunlik_holati(start, end, group_ids, vf, group_field='viloyat_id'):
+    """Kunlar kesimida guruh (viloyat yoki tuman) bo'yicha murojaatlar sonini hisoblaydi. Maksimal 31 kunlik oraliq."""
     d_start = datetime.strptime(start, '%Y-%m-%d').date()
     d_end   = datetime.strptime(end,   '%Y-%m-%d').date()
     kesildimi = False
@@ -2677,37 +2671,70 @@ def _kunlik_holati_data(request):
         end = d_end.isoformat()
         kesildimi = True
 
-    viloyatlar = _hisobot_viloyatlar(request)
-    v_ids = [v['id'] for v in viloyatlar]
-    vf = get_viloyat_qs_filter(request, 'viloyat_id')
-
     sanalar = []
     d = d_start
     while d <= d_end:
         sanalar.append(d.isoformat())
         d += timedelta(days=1)
 
-    qs = Murojaat.objects.filter(sana__gte=start, sana__lte=end, viloyat_id__in=v_ids, **vf) \
+    qs = Murojaat.objects.filter(sana__gte=start, sana__lte=end, **{f'{group_field}__in': group_ids}, **vf) \
                           .exclude(holat='takroriy') \
-                          .values('viloyat_id', 'sana').annotate(n=Count('id'))
+                          .values(group_field, 'sana').annotate(n=Count('id'))
 
-    data = {vid: {s: 0 for s in sanalar} for vid in v_ids}
+    data = {gid: {s: 0 for s in sanalar} for gid in group_ids}
     for row in qs:
-        vid = row['viloyat_id']
+        gid = row[group_field]
         s   = row['sana'].isoformat() if hasattr(row['sana'], 'isoformat') else row['sana']
-        if vid in data and s in data[vid]:
-            data[vid][s] = row['n']
+        if gid in data and s in data[gid]:
+            data[gid][s] = row['n']
 
     # Takroriy murojaatlar — jamiga qo'shilmaydi, alohida ustunda ko'rsatiladi
-    tq = Murojaat.objects.filter(sana__gte=start, sana__lte=end, viloyat_id__in=v_ids,
+    tq = Murojaat.objects.filter(sana__gte=start, sana__lte=end, **{f'{group_field}__in': group_ids},
                                   holat='takroriy', **vf) \
-                          .values('viloyat_id').annotate(n=Count('id'))
-    takroriy = {vid: 0 for vid in v_ids}
+                          .values(group_field).annotate(n=Count('id'))
+    takroriy = {gid: 0 for gid in group_ids}
     for row in tq:
-        takroriy[row['viloyat_id']] = row['n']
+        takroriy[row[group_field]] = row['n']
+
+    return sanalar, data, takroriy, start, end, kesildimi
+
+
+def _kunlik_holati_data(request):
+    """Har bir viloyat kunlar kesimida qancha murojaat kiritganini hisoblaydi (kim kiritgan, kim kiritmagan)."""
+    start = request.GET.get('start', date.today().replace(day=1).isoformat())
+    end   = request.GET.get('end',   date.today().isoformat())
+
+    viloyatlar = _hisobot_viloyatlar(request)
+    v_ids = [v['id'] for v in viloyatlar]
+    vf = get_viloyat_qs_filter(request, 'viloyat_id')
+
+    sanalar, data, takroriy, start, end, kesildimi = _compute_kunlik_holati(start, end, v_ids, vf, 'viloyat_id')
 
     return {
         'viloyatlar': viloyatlar, 'sanalar': sanalar, 'data': data, 'takroriy': takroriy,
+        'start': start, 'end': end, 'kesildimi': kesildimi,
+    }
+
+
+def _kunlik_holati_tuman_data(request):
+    """Har bir tuman kunlar kesimida qancha murojaat kiritganini hisoblaydi (bitta viloyat ichida)."""
+    start = request.GET.get('start', date.today().replace(day=1).isoformat())
+    end   = request.GET.get('end',   date.today().isoformat())
+
+    tumanlar, viloyat_id = _hisobot_tumanlar(request)
+    if not viloyat_id:
+        return {'error': 'viloyat aniqlanmadi'}
+
+    t_ids = [t['id'] for t in tumanlar]
+    vf = {'viloyat_id': viloyat_id}
+    tuman_id = request.GET.get('tuman')
+    if tuman_id:
+        vf['tuman_id'] = int(tuman_id)
+
+    sanalar, data, takroriy, start, end, kesildimi = _compute_kunlik_holati(start, end, t_ids, vf, 'tuman_id')
+
+    return {
+        'tumanlar': tumanlar, 'sanalar': sanalar, 'data': data, 'takroriy': takroriy,
         'start': start, 'end': end, 'kesildimi': kesildimi,
     }
 
@@ -2718,13 +2745,22 @@ def murojaat_kunlik_holati(request):
     return Response(_kunlik_holati_data(request))
 
 
-def _build_kunlik_holati_workbook(result):
-    """Kunlik murojaatlar holati uchun Excel workbook (viloyat x sana)."""
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def murojaat_kunlik_holati_tuman(request):
+    result = _kunlik_holati_tuman_data(request)
+    if 'error' in result:
+        return Response(result, status=400)
+    return Response(result)
+
+
+def _build_kunlik_holati_workbook(result, groups_key='viloyatlar', group_label='Viloyat', title='KUNLIK MUROJAATLAR HOLATI'):
+    """Kunlik murojaatlar holati uchun Excel workbook (viloyat/tuman x sana)."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
 
-    viloyatlar, sanalar, data = result['viloyatlar'], result['sanalar'], result['data']
+    groups, sanalar, data = result[groups_key], result['sanalar'], result['data']
     takroriy = result.get('takroriy', {})
     start, end = result['start'], result['end']
 
@@ -2748,17 +2784,17 @@ def _build_kunlik_holati_workbook(result):
     RED_F     = fill('F8CBCB')
     LT_BLUE   = fill('DEEAF1')
 
-    total_cols = 1 + len(sanalar) + 1 + 1  # Viloyat + sanalar + ЖАМИ + Такрорий
+    total_cols = 1 + len(sanalar) + 1 + 1  # Guruh + sanalar + ЖАМИ + Такрорий
 
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
-    c = ws.cell(1, 1, f'KUNLIK MUROJAATLAR HOLATI   ({start} — {end})')
+    c = ws.cell(1, 1, f'{title}   ({start} — {end})')
     c.font = fnt(bold=True, color='FFFFFF', size=12)
     c.fill = DARK_BLUE
     c.alignment = ctr
     c.border = mbrd
     ws.row_dimensions[1].height = 30
 
-    col_names = ['Viloyat'] + [f'{s[8:10]}.{s[5:7]}' for s in sanalar] + ['ЖАМИ', 'Такрорий']
+    col_names = [group_label] + [f'{s[8:10]}.{s[5:7]}' for s in sanalar] + ['ЖАМИ', 'Такрорий']
     for ci, h in enumerate(col_names, 1):
         c = ws.cell(2, ci, h)
         c.font = fnt(bold=True, color='FFFFFF', size=9)
@@ -2774,7 +2810,7 @@ def _build_kunlik_holati_workbook(result):
     ws.column_dimensions[get_column_letter(3 + len(sanalar))].width = 10
 
     er = 3
-    for v in viloyatlar:
+    for v in groups:
         row = data.get(v['id'], {})
         jami = sum(row.get(s, 0) or 0 for s in sanalar)
 
@@ -2812,6 +2848,28 @@ def murojaat_kunlik_holati_excel(request):
     wb.save(buf)
     buf.seek(0)
     fname = f"murojaat_kunlik_holati_{result['start']}_{result['end']}.xlsx"
+    return HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="{fname}"'}
+    )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def murojaat_kunlik_holati_tuman_excel(request):
+    import io
+    result = _kunlik_holati_tuman_data(request)
+    if 'error' in result:
+        return Response(result, status=400)
+    wb = _build_kunlik_holati_workbook(
+        result, groups_key='tumanlar', group_label='Tuman',
+        title='KUNLIK MUROJAATLAR HOLATI (TUMANLAR)'
+    )
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f"murojaat_kunlik_holati_tuman_{result['start']}_{result['end']}.xlsx"
     return HttpResponse(
         buf.read(),
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
