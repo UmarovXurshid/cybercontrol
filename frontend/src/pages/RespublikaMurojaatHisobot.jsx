@@ -31,19 +31,30 @@ export default function RespublikaMurojaatHisobot() {
   const [kunlik,        setKunlik]        = useState(null)
   const [kunlikLoading, setKunlikLoading] = useState(false)
 
-  const load = async (s = start, e = end) => {
+  const [viloyatlarRoyxati, setViloyatlarRoyxati] = useState([])
+  const [viloyatFilter,     setViloyatFilter]     = useState('')
+
+  useEffect(() => {
+    api.get('/viloyatlar/').then(r => setViloyatlarRoyxati(r.data.results || r.data)).catch(() => {})
+  }, [])
+
+  const load = async (s = start, e = end, v = viloyatFilter) => {
     setLoading(true)
     try {
-      const { data: d } = await api.get(`/murojaat/hisobot/?start=${s}&end=${e}`)
+      const params = new URLSearchParams({ start: s, end: e })
+      if (v) params.append('viloyat', v)
+      const { data: d } = await api.get(`/murojaat/hisobot/?${params}`)
       setData(d)
     } catch { toast.error('Yuklab bo\'lmadi') }
     finally { setLoading(false) }
   }
 
-  const loadKunlik = async (s = start, e = end) => {
+  const loadKunlik = async (s = start, e = end, v = viloyatFilter) => {
     setKunlikLoading(true)
     try {
-      const { data: d } = await api.get(`/murojaat/kunlik-holati/?start=${s}&end=${e}`)
+      const params = new URLSearchParams({ start: s, end: e })
+      if (v) params.append('viloyat', v)
+      const { data: d } = await api.get(`/murojaat/kunlik-holati/?${params}`)
       setKunlik(d)
     } catch { toast.error('Yuklab bo\'lmadi') }
     finally { setKunlikLoading(false) }
@@ -52,9 +63,17 @@ export default function RespublikaMurojaatHisobot() {
   useEffect(() => { load() }, [])
   useEffect(() => { if (tab === 'kunlik' && !kunlik) loadKunlik() }, [tab])
 
+  const applyFilter = () => {
+    load(start, end, viloyatFilter)
+    setKunlik(null)
+    if (tab === 'kunlik') loadKunlik(start, end, viloyatFilter)
+  }
+
   const exportExcel = async () => {
     const token = localStorage.getItem('token')
-    const url = `/api/murojaat/hisobot/excel/?start=${start}&end=${end}`
+    const params = new URLSearchParams({ start, end })
+    if (viloyatFilter) params.append('viloyat', viloyatFilter)
+    const url = `/api/murojaat/hisobot/excel/?${params}`
     try {
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) { toast.error('Excel yuklab olinmadi'); return }
@@ -70,7 +89,9 @@ export default function RespublikaMurojaatHisobot() {
     const token = localStorage.getItem('token')
     const s = kunlik?.start || start
     const e = kunlik?.end   || end
-    const url = `/api/murojaat/kunlik-holati/excel/?start=${s}&end=${e}`
+    const params = new URLSearchParams({ start: s, end: e })
+    if (viloyatFilter) params.append('viloyat', viloyatFilter)
+    const url = `/api/murojaat/kunlik-holati/excel/?${params}`
     try {
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) { toast.error('Excel yuklab olinmadi'); return }
@@ -136,7 +157,14 @@ export default function RespublikaMurojaatHisobot() {
           <label className="form-label">Oxiri</label>
           <input type="date" value={end} onChange={e => setEnd(e.target.value)} className="input-field w-40"/>
         </div>
-        <button onClick={() => { load(start, end); if (tab === 'kunlik') loadKunlik(start, end) }} className="btn-primary">🔍 Ko'rsatish</button>
+        <div>
+          <label className="form-label">Viloyat</label>
+          <select value={viloyatFilter} onChange={e => setViloyatFilter(e.target.value)} className="input-field w-48">
+            <option value="">Barchasi</option>
+            {viloyatlarRoyxati.map(v => <option key={v.id} value={v.id}>{v.nomi}</option>)}
+          </select>
+        </div>
+        <button onClick={applyFilter} className="btn-primary">🔍 Ko'rsatish</button>
         <button onClick={exportExcel}
           className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-medium flex items-center gap-2">
           📥 Excel yuklab olish
