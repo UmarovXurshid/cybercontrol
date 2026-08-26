@@ -218,15 +218,16 @@ export default function RespublikaMurojaatHisobot() {
             const erkakRow = data.rows.find(r => r.nomi === 'ЭРКАК')
             const ayolRow  = data.rows.find(r => r.nomi === 'АЁЛ')
             return (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                 {[
                   { label: 'Jami murojaatlar', val: total, color: 'bg-indigo-600' },
                   { label: 'Bugungi kun', val: bugun, color: 'bg-blue-500' },
                   { label: 'Erkak', val: erkakRow?.jami?.total || 0, color: 'bg-teal-600' },
                   { label: 'Ayol', val: ayolRow?.jami?.total || 0, color: 'bg-pink-500' },
-                ].map(({ label, val, color }) => (
+                  { label: "Yetkazilgan zarar", val: `${Number(data.zarar_jami || 0).toLocaleString('ru-RU')} so'm`, color: 'bg-orange-600', small: true },
+                ].map(({ label, val, color, small }) => (
                   <div key={label} className={`${color} text-white rounded-2xl p-5`}>
-                    <div className="text-3xl font-bold">{val}</div>
+                    <div className={`font-bold ${small ? 'text-xl' : 'text-3xl'}`}>{val}</div>
                     <div className="text-sm mt-1 opacity-90">{label}</div>
                   </div>
                 ))}

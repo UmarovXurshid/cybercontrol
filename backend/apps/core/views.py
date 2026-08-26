@@ -2649,6 +2649,15 @@ def _build_hisobot_rows(start, end, v_ids, vf=None, group_field='viloyat_id'):
     return rows
 
 
+def _zarar_jami(start, end, vf=None):
+    """Berilgan davr va filtr bo'yicha yetkazilgan zararlar summasi (takroriy murojaatlarsiz)."""
+    from django.db.models import Sum
+    qs = Murojaat.objects.filter(sana__gte=start, sana__lte=end).exclude(holat='takroriy')
+    if vf:
+        qs = qs.filter(**vf)
+    return float(qs.aggregate(s=Sum('zarar'))['s'] or 0)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def murojaat_hisobot(request):
@@ -2658,7 +2667,8 @@ def murojaat_hisobot(request):
     v_ids = [v['id'] for v in viloyatlar]
     vf = get_viloyat_qs_filter(request, 'viloyat_id')
     rows = _build_hisobot_rows(start, end, v_ids, vf)
-    return Response({'viloyatlar': viloyatlar, 'rows': rows, 'start': start, 'end': end})
+    zarar_jami = _zarar_jami(start, end, vf)
+    return Response({'viloyatlar': viloyatlar, 'rows': rows, 'start': start, 'end': end, 'zarar_jami': zarar_jami})
 
 
 def _compute_kunlik_holati(start, end, group_ids, vf, group_field='viloyat_id'):
@@ -3095,7 +3105,8 @@ def murojaat_hisobot_tuman(request):
         vf['tuman_id'] = int(tuman_id)
 
     rows = _build_hisobot_rows(start, end, t_ids, vf, group_field='tuman_id')
-    return Response({'tumanlar': tumanlar, 'rows': rows, 'start': start, 'end': end})
+    zarar_jami = _zarar_jami(start, end, vf)
+    return Response({'tumanlar': tumanlar, 'rows': rows, 'start': start, 'end': end, 'zarar_jami': zarar_jami})
 
 
 @api_view(['GET'])
