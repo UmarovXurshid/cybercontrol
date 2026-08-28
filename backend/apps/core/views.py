@@ -461,6 +461,25 @@ def hisobot_kunlik(request):
         r['yuborilgan']             = bool(r.pop('yuborilgan_soni', 0))
         r['ogohlantirish_yuborildi'] = bool(r.get('ogohlantirish_yuborildi', 0))
         r['jami_fuqarolar']         = int(r['offline_qatnashchi'] or 0) + int(r['online_qatnashchi'] or 0)
+
+    holat = request.GET.get('holat')  # 'bajarilgan' | 'bajarilmagan'
+    if holat == 'bajarilgan':
+        rows = [r for r in rows if r['yuborilgan']]
+    elif holat == 'bajarilmagan':
+        rows = [r for r in rows if not r['yuborilgan']]
+
+    if request.GET.get('excel'):
+        headers = ['#', 'Tuman', 'Mahalla', 'Inspektor FIO', 'Telefon',
+                   'Offline', 'Online', 'Jami fuqarolar', 'Holat', 'Ogohlantirish']
+        data = [[i+1, r['tuman_nomi'], r['mahalla_nomi'], r['inspektor_fio'], r['inspektor_tel'],
+                 r['offline_soni'], r['online_soni'], r['jami_fuqarolar'],
+                 'Bajarilgan' if r['yuborilgan'] else 'Bajarilmagan',
+                 'Ogohlantirilgan' if r['ogohlantirish_yuborildi'] else '-']
+                for i, r in enumerate(rows)]
+        suffix = {'bajarilgan': '_bajarilgan', 'bajarilmagan': '_bajarilmagan'}.get(holat, '')
+        audit(request, 'excel_yuklab_olish', f"Kunlik hisobot{suffix} {kun}")
+        return excel_response(headers, data, f"hisobot_kunlik{suffix}_{kun}.xlsx")
+
     return Response(rows)
 
 # ── Hisobot kunlik: navbatchilikdan tashqari (targ'ibot kuni bo'lmasa ham hisobot yuborganlar) ─

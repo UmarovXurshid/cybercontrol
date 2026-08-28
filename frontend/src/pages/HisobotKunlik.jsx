@@ -327,6 +327,8 @@ export default function HisobotKunlik() {
   const [start, setStart]     = useState(today)
   const [end, setEnd]         = useState(today)
   const [sending, setSending] = useState(false)
+  const [holatFilter, setHolatFilter] = useState('barcha') // 'barcha' | 'bajarilgan' | 'bajarilmagan'
+  const [exporting, setExporting]     = useState(false)
 
   const [qList, setQList]       = useState([])
   const [qLoading, setQLoading] = useState(false)
@@ -346,6 +348,30 @@ export default function HisobotKunlik() {
     } catch { toast.error('Xato!') }
     finally { setSending(false) }
   }
+
+  const exportKunlikExcel = async (holat) => {
+    setExporting(true)
+    try {
+      const token = localStorage.getItem('token')
+      const q = holat ? `&holat=${holat}` : ''
+      const res = await fetch(`/api/hisobot-kunlik/?start=${start}&end=${end}&excel=1${q}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) throw new Error()
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url
+      const suffix = holat ? `_${holat}` : ''
+      a.download = `hisobot_kunlik${suffix}_${start}.xlsx`; a.click()
+      URL.revokeObjectURL(url)
+    } catch { toast.error('Excel yuklab olishda xato!') }
+    finally { setExporting(false) }
+  }
+
+  const filteredList = list.filter(r =>
+    holatFilter === 'bajarilgan' ? r.yuborilgan :
+    holatFilter === 'bajarilmagan' ? !r.yuborilgan : true
+  )
 
   const loadQoshimcha = async (s = start) => {
     setQLoading(true)
@@ -411,6 +437,32 @@ export default function HisobotKunlik() {
             </button>
           </DateFilter>
 
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="flex rounded-lg overflow-hidden border border-gray-300">
+              <button onClick={() => setHolatFilter('barcha')}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${holatFilter==='barcha' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                Barchasi
+              </button>
+              <button onClick={() => setHolatFilter('bajarilgan')}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-300 ${holatFilter==='bajarilgan' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                ✅ Bajarilgan
+              </button>
+              <button onClick={() => setHolatFilter('bajarilmagan')}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-300 ${holatFilter==='bajarilmagan' ? 'bg-red-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                ❌ Bajarilmagan
+              </button>
+            </div>
+
+            <button onClick={() => exportKunlikExcel('bajarilgan')} disabled={exporting}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium disabled:opacity-60 transition-colors">
+              ⬇️ Bajarilganlar (Excel)
+            </button>
+            <button onClick={() => exportKunlikExcel('bajarilmagan')} disabled={exporting}
+              className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium disabled:opacity-60 transition-colors">
+              ⬇️ Bajarilmaganlar (Excel)
+            </button>
+          </div>
+
           <div className="card overflow-hidden p-0">
             <table className="w-full">
               <thead><tr>
@@ -419,7 +471,7 @@ export default function HisobotKunlik() {
                 ))}
               </tr></thead>
               <tbody>
-                {list.map((r,i)=>(
+                {filteredList.map((r,i)=>(
                   <tr key={i} className={`hover:bg-gray-50 ${!r.yuborilgan ? 'bg-red-50' : ''}`}>
                     <td className="table-cell text-gray-400">{i+1}</td>
                     <td className="table-cell font-medium">{r.mahalla_nomi}</td>
@@ -446,7 +498,7 @@ export default function HisobotKunlik() {
                     </td>
                   </tr>
                 ))}
-                {list.length===0 && (
+                {filteredList.length===0 && (
                   <tr><td colSpan={9} className="text-center py-10 text-gray-400">Ma'lumot topilmadi</td></tr>
                 )}
               </tbody>
