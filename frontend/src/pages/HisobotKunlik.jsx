@@ -466,7 +466,7 @@ export default function HisobotKunlik() {
           <div className="card overflow-hidden p-0">
             <table className="w-full">
               <thead><tr>
-                {['#','Mahalla','Tuman','Inspektor','Offline','Online','Jami fuk.','Holat','Ogohlantirish'].map(h=>(
+                {['#','Mahalla','Tuman','Inspektor','Offline joy','Offline qatnashchi','Online joy','Online qatnashchi','Jami fuk.','Murojaat','Holat','Ogohlantirish'].map(h=>(
                   <th key={h} className="table-header text-left">{h}</th>
                 ))}
               </tr></thead>
@@ -480,11 +480,16 @@ export default function HisobotKunlik() {
                     <td className="table-cell">
                       {r.offline_soni > 0 ? <span className="badge-blue">{r.offline_soni}</span> : <span className="text-gray-300">—</span>}
                     </td>
+                    <td className="table-cell text-sm">{(r.offline_qatnashchi||0).toLocaleString()}</td>
                     <td className="table-cell">
                       {r.online_soni > 0 ? <span className="badge-green">{r.online_soni}</span> : <span className="text-gray-300">—</span>}
                     </td>
+                    <td className="table-cell text-sm">{(r.online_qatnashchi||0).toLocaleString()}</td>
                     <td className="table-cell font-semibold">
                       {(r.offline_qatnashchi||0) + (r.online_qatnashchi||0)}
+                    </td>
+                    <td className="table-cell">
+                      {r.murojaat_soni > 0 ? <span className="badge-red">{r.murojaat_soni}</span> : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="table-cell">
                       {r.yuborilgan
@@ -499,7 +504,7 @@ export default function HisobotKunlik() {
                   </tr>
                 ))}
                 {filteredList.length===0 && (
-                  <tr><td colSpan={9} className="text-center py-10 text-gray-400">Ma'lumot topilmadi</td></tr>
+                  <tr><td colSpan={12} className="text-center py-10 text-gray-400">Ma'lumot topilmadi</td></tr>
                 )}
               </tbody>
             </table>

@@ -447,13 +447,15 @@ def hisobot_kunlik(request):
                (SELECT COALESCE(SUM(h.online_18_gacha),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                 AND DATE(h.qushilgan_vaqt)=%s) AS online_18_gacha,
                (SELECT COALESCE(SUM(h.online_18_katta),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
-                AND DATE(h.qushilgan_vaqt)=%s) AS online_18_katta
+                AND DATE(h.qushilgan_vaqt)=%s) AS online_18_katta,
+               (SELECT COUNT(*) FROM murojaat m WHERE m.mahalla_id=mahalla.id
+                AND m.sana=%s AND m.holat != 'takroriy') AS murojaat_soni
         FROM mahalla JOIN tuman ON mahalla.tuman_id=tuman.id
         WHERE (mahalla.navbatchilik_kuni1=%s OR mahalla.navbatchilik_kuni2=%s){extra_where}
         ORDER BY tuman.id, mahalla.mahalla_nomi
     """
     with connection.cursor() as cur:
-        cur.execute(sql, [kun, kun, kun, kun, kun, kun, kun, kun, kun, kun, php_day, php_day] + extra_params)
+        cur.execute(sql, [kun, kun, kun, kun, kun, kun, kun, kun, kun, kun, kun, php_day, php_day] + extra_params)
         cols = [c[0] for c in cur.description]
         rows = [dict(zip(cols, r)) for r in cur.fetchall()]
 
@@ -461,6 +463,7 @@ def hisobot_kunlik(request):
         r['yuborilgan']             = bool(r.pop('yuborilgan_soni', 0))
         r['ogohlantirish_yuborildi'] = bool(r.get('ogohlantirish_yuborildi', 0))
         r['jami_fuqarolar']         = int(r['offline_qatnashchi'] or 0) + int(r['online_qatnashchi'] or 0)
+        r['murojaat_soni']          = int(r['murojaat_soni'] or 0)
 
     holat = request.GET.get('holat')  # 'bajarilgan' | 'bajarilmagan'
     if holat == 'bajarilgan':
@@ -470,9 +473,11 @@ def hisobot_kunlik(request):
 
     if request.GET.get('excel'):
         headers = ['#', 'Tuman', 'Mahalla', 'Inspektor FIO', 'Telefon',
-                   'Offline', 'Online', 'Jami fuqarolar', 'Holat', 'Ogohlantirish']
+                   'Offline joy', 'Offline qatnashchi', 'Online joy', 'Online qatnashchi',
+                   'Jami fuqarolar', 'Murojaat', 'Holat', 'Ogohlantirish']
         data = [[i+1, r['tuman_nomi'], r['mahalla_nomi'], r['inspektor_fio'], r['inspektor_tel'],
-                 r['offline_soni'], r['online_soni'], r['jami_fuqarolar'],
+                 r['offline_soni'], r['offline_qatnashchi'], r['online_soni'], r['online_qatnashchi'],
+                 r['jami_fuqarolar'], r['murojaat_soni'],
                  'Bajarilgan' if r['yuborilgan'] else 'Bajarilmagan',
                  'Ogohlantirilgan' if r['ogohlantirish_yuborildi'] else '-']
                 for i, r in enumerate(rows)]
