@@ -31,6 +31,7 @@ urlpatterns = [
     # Hisobotlar
     path('hisobot/',                   views.hisobot),
     path('hisobot-kunlik/',            views.hisobot_kunlik),
+    path('hisobot-kunlik/qoshimcha/',  views.hisobot_kunlik_qoshimcha),
     path('hisobot-tumanlar/',          views.hisobot_tumanlar),
     path('hisobot-viloyatlar/',        views.hisobot_viloyatlar),
     path('qilmaganlar/',               views.qilmaganlar),

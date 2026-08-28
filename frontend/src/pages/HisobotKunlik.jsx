@@ -328,6 +328,10 @@ export default function HisobotKunlik() {
   const [end, setEnd]         = useState(today)
   const [sending, setSending] = useState(false)
 
+  const [qList, setQList]       = useState([])
+  const [qLoading, setQLoading] = useState(false)
+  const [qLoaded, setQLoaded]   = useState(false)
+
   const load = (s=start, e=end) =>
     api.get(`/hisobot-kunlik/?start=${s}&end=${e}`).then(r=>setList(r.data))
 
@@ -341,6 +345,33 @@ export default function HisobotKunlik() {
       load()
     } catch { toast.error('Xato!') }
     finally { setSending(false) }
+  }
+
+  const loadQoshimcha = async (s = start) => {
+    setQLoading(true)
+    try {
+      const res = await api.get(`/hisobot-kunlik/qoshimcha/?start=${s}`)
+      setQList(res.data)
+      setQLoaded(true)
+    } catch { toast.error("Ma'lumot yuklashda xato!") }
+    finally { setQLoading(false) }
+  }
+
+  const exportQoshimchaExcel = async () => {
+    setQLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`/api/hisobot-kunlik/qoshimcha/?start=${start}&excel=1`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) throw new Error()
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url
+      a.download = `navbatchilikdan_tashqari_${start}.xlsx`; a.click()
+      URL.revokeObjectURL(url)
+    } catch { toast.error('Excel yuklab olishda xato!') }
+    finally { setQLoading(false) }
   }
 
   return (
@@ -361,6 +392,11 @@ export default function HisobotKunlik() {
           className={`px-4 py-2 text-sm font-medium rounded-t border-b-2 transition-colors
             ${tab==='xavfsiz' ? 'border-green-600 text-green-700 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
           📊 Xavfsiz va Sog'lom Yurt
+        </button>
+        <button onClick={() => { setTab('qoshimcha'); if (!qLoaded) loadQoshimcha() }}
+          className={`px-4 py-2 text-sm font-medium rounded-t border-b-2 transition-colors
+            ${tab==='qoshimcha' ? 'border-orange-600 text-orange-700 bg-orange-50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+          ➕ Navbatchilikdan tashqari
         </button>
       </div>
 
@@ -429,6 +465,67 @@ export default function HisobotKunlik() {
 
       {/* ── Tab 2: Xavfsiz va Sog'lom Yurt ── */}
       {tab === 'xavfsiz' && <XavfsizYurtTab />}
+
+      {/* ── Tab 3: Navbatchilikdan tashqari targ'ibot ── */}
+      {tab === 'qoshimcha' && (
+        <>
+          <div className="flex flex-wrap items-end gap-3 mb-5">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Sana</label>
+              <input type="date" value={start} onChange={e => setStart(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:outline-none" />
+            </div>
+            <button onClick={() => loadQoshimcha(start)} disabled={qLoading}
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium disabled:opacity-60 transition-colors">
+              {qLoading ? '⏳' : '🔍'} Ko'rish
+            </button>
+            <button onClick={exportQoshimchaExcel} disabled={qLoading}
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium disabled:opacity-60 transition-colors">
+              ⬇️ Excel yuklab olish
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-400 mb-3">
+            Bugun <b>navbatchilik kuni bo'lmasa ham</b> targ'ibot hisobotini yuborgan mahallalar ({KUNLAR[new Date(start).getDay()]}).
+          </p>
+
+          <div className="card overflow-hidden p-0">
+            <table className="w-full">
+              <thead><tr>
+                {['#','Mahalla','Tuman','Inspektor','Offline ishtirokchilar','Online tarqatilganlar','Online qatnashchilar','Jami fuk.','Murojaatlar (kunlik)'].map(h=>(
+                  <th key={h} className="table-header text-left">{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {qList.map((r,i)=>(
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="table-cell text-gray-400">{i+1}</td>
+                    <td className="table-cell font-medium">{r.mahalla_nomi}</td>
+                    <td className="table-cell text-xs text-gray-500">{r.tuman_nomi}</td>
+                    <td className="table-cell text-xs">{r.inspektor_fio}</td>
+                    <td className="table-cell">
+                      {r.offline_qatnashchi > 0 ? <span className="badge-blue">{r.offline_qatnashchi}</span> : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="table-cell">
+                      {r.online_tarqatilgan > 0 ? <span className="badge-green">{r.online_tarqatilgan}</span> : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="table-cell">
+                      {r.online_qatnashchi > 0 ? <span className="badge-green">{r.online_qatnashchi}</span> : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="table-cell font-semibold">{r.jami_fuqarolar}</td>
+                    <td className="table-cell">
+                      {r.murojaat_soni > 0 ? <span className="badge-blue">{r.murojaat_soni}</span> : <span className="text-gray-300">—</span>}
+                    </td>
+                  </tr>
+                ))}
+                {qList.length===0 && !qLoading && (
+                  <tr><td colSpan={9} className="text-center py-10 text-gray-400">Ma'lumot topilmadi</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -463,6 +463,58 @@ def hisobot_kunlik(request):
         r['jami_fuqarolar']         = int(r['offline_qatnashchi'] or 0) + int(r['online_qatnashchi'] or 0)
     return Response(rows)
 
+# ── Hisobot kunlik: navbatchilikdan tashqari (targ'ibot kuni bo'lmasa ham hisobot yuborganlar) ─
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def hisobot_kunlik_qoshimcha(request):
+    kun     = request.GET.get('start', request.GET.get('kun', date.today().isoformat()))
+    hafta   = datetime.strptime(kun, '%Y-%m-%d').weekday()
+    php_day = (hafta + 1) % 7
+
+    extra_where, extra_params = get_viloyat_sql(request)
+
+    sql = f"""
+        SELECT tuman.tuman_nomi, mahalla.mahalla_nomi, mahalla.inspektor_fio, mahalla.inspektor_tel,
+               (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
+                AND DATE(h.qushilgan_vaqt)=%s AND h.targibot_turi=1) AS offline_qatnashchi,
+               (SELECT COALESCE(SUM(h.qatnashchilar_soni),0) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
+                AND DATE(h.qushilgan_vaqt)=%s AND h.targibot_turi=2) AS online_qatnashchi,
+               (SELECT COALESCE(SUM(h.video_kontent_soni+h.banner_soni+h.flayer_soni+h.buklet_soni+h.boshqa_material_soni),0)
+                FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
+                AND DATE(h.qushilgan_vaqt)=%s AND h.targibot_turi=2) AS online_tarqatilgan,
+               (SELECT COUNT(*) FROM murojaat m WHERE m.mahalla_id=mahalla.id
+                AND m.sana=%s AND m.holat != 'takroriy') AS murojaat_soni
+        FROM mahalla JOIN tuman ON mahalla.tuman_id=tuman.id
+        WHERE NOT (mahalla.navbatchilik_kuni1=%s OR mahalla.navbatchilik_kuni2=%s){extra_where}
+          AND EXISTS (SELECT 1 FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2 AND DATE(h.qushilgan_vaqt)=%s)
+        ORDER BY tuman.id, mahalla.mahalla_nomi
+    """
+    params = [kun, kun, kun, kun, php_day, php_day] + extra_params + [kun]
+    with connection.cursor() as cur:
+        cur.execute(sql, params)
+        cols = [c[0] for c in cur.description]
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+
+    for r in rows:
+        r['offline_qatnashchi']  = int(r['offline_qatnashchi']  or 0)
+        r['online_qatnashchi']   = int(r['online_qatnashchi']   or 0)
+        r['online_tarqatilgan']  = int(r['online_tarqatilgan']  or 0)
+        r['murojaat_soni']       = int(r['murojaat_soni']       or 0)
+        r['jami_fuqarolar']      = r['offline_qatnashchi'] + r['online_qatnashchi']
+
+    if request.GET.get('excel'):
+        headers = ['#', 'Tuman', 'Mahalla', 'Inspektor FIO', 'Telefon',
+                   'Offline ishtirokchilar', 'Online tarqatilganlar', 'Online qatnashchilar',
+                   'Jami fuqarolar', 'Murojaatlar (kunlik)']
+        data = [[i+1, r['tuman_nomi'], r['mahalla_nomi'], r['inspektor_fio'], r['inspektor_tel'],
+                 r['offline_qatnashchi'], r['online_tarqatilgan'], r['online_qatnashchi'],
+                 r['jami_fuqarolar'], r['murojaat_soni']]
+                for i, r in enumerate(rows)]
+        audit(request, 'excel_yuklab_olish', f"Navbatchilikdan tashqari targ'ibot hisoboti {kun}")
+        return excel_response(headers, data, f"navbatchilikdan_tashqari_{kun}.xlsx")
+
+    return Response(rows)
+
 # ── Hisobot tumanlar ──────────────────────────────────────────────────────────
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
