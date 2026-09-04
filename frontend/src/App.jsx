@@ -28,6 +28,7 @@ import OylikDinamika from './pages/OylikDinamika'
 import HaftalikHolat from './pages/HafalikHolat'
 
 import Murojaat from './pages/Murojaat'
+import MurojaatStatistika from './pages/MurojaatStatistika'
 import MurojaatHisobotTuman from './pages/MurojaatHisobotTuman'
 import RespublikaMurojaatHisobot from './pages/RespublikaMurojaatHisobot'
 
@@ -78,6 +79,7 @@ export default function App() {
           <Route path="oylik-dinamika"                         element={<OylikDinamika/>}/>
           <Route path="haftalik-holat"                         element={<HaftalikHolat/>}/>
           <Route path="murojaat"                              element={<Murojaat/>}/>
+          <Route path="murojaat-statistika"                  element={<MurojaatStatistika/>}/>
           <Route path="murojaat-hisobot"                     element={<MurojaatHisobotTuman/>}/>
           <Route path="xabar-yuborish"                       element={<XabarYuborish/>}/>
           <Route path="tumanlar"                             element={<Tumanlar/>}/>
@@ -95,6 +97,7 @@ export default function App() {
           <Route path="kunlik-ishlar"        element={<KunlikIshlar/>}/>
           <Route path="hisobot"              element={<RespublikaHisobot/>}/>
           <Route path="murojaat"          element={<Murojaat/>}/>
+          <Route path="murojaat-statistika" element={<MurojaatStatistika/>}/>
           <Route path="murojaat-hisobot"  element={<RespublikaMurojaatHisobot/>}/>
           <Route path="samaradorlik"      element={<Samaradorlik/>}/>
           <Route path="xavfli-hududlar"  element={<XavfliMahallalar/>}/>

@@ -2809,6 +2809,95 @@ def murojaat_hisobot(request):
     return Response({'viloyatlar': viloyatlar, 'rows': rows, 'start': start, 'end': end, 'zarar_jami': zarar_jami})
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def murojaat_statistika(request):
+    """Murojaatlar bo'yicha infografika: viloyat/tuman kesimida xarita, usul/jinsi/yosh kesimida taqsimot."""
+    start = request.GET.get('start')
+    end   = request.GET.get('end')
+    vf = get_viloyat_qs_filter(request, 'viloyat_id')
+    qs = Murojaat.objects.filter(**vf)
+    if start:
+        qs = qs.filter(sana__gte=start)
+    if end:
+        qs = qs.filter(sana__lte=end)
+
+    # ── Viloyat va tuman kesimida (xarita uchun) ──────────────────────────────
+    viloyat_rows = list(
+        qs.values('viloyat_id', 'viloyat__nomi')
+          .annotate(soni=Count('id'), zarar_jami=Sum('zarar'))
+          .order_by('-soni')
+    )
+    tuman_rows = list(
+        qs.values('tuman_id', 'tuman__tuman_nomi', 'viloyat_id')
+          .annotate(soni=Count('id'), zarar_jami=Sum('zarar'))
+          .order_by('-soni')
+    )
+    viloyatlar = []
+    for v in viloyat_rows:
+        tumanlar = [
+            {'id': t['tuman_id'], 'nomi': t['tuman__tuman_nomi'],
+             'soni': t['soni'], 'zarar_jami': float(t['zarar_jami'] or 0)}
+            for t in tuman_rows if t['viloyat_id'] == v['viloyat_id']
+        ]
+        viloyatlar.append({
+            'id': v['viloyat_id'], 'nomi': v['viloyat__nomi'],
+            'soni': v['soni'], 'zarar_jami': float(v['zarar_jami'] or 0),
+            'tumanlar': tumanlar,
+        })
+
+    # ── Usul kesimida (asosiy (ota) kategoriyaga yig'ib) ──────────────────────
+    usul_map = {u.id: u for u in MurojaatUsul.objects.all()}
+    def root_usul_nomi(uid):
+        u = usul_map.get(uid)
+        depth = 0
+        while u and u.ota_id and depth < 10:
+            u = usul_map.get(u.ota_id)
+            depth += 1
+        return u.nomi if u else "Noma'lum"
+
+    usul_counts = {}
+    for row in qs.exclude(usul_id__isnull=True).values('usul_id').annotate(soni=Count('id')):
+        nomi = root_usul_nomi(row['usul_id'])
+        usul_counts[nomi] = usul_counts.get(nomi, 0) + row['soni']
+    usul_stat = sorted(
+        [{'nomi': k, 'soni': v} for k, v in usul_counts.items()],
+        key=lambda x: -x['soni']
+    )
+
+    # ── Jinsi kesimida ─────────────────────────────────────────────────────────
+    jinsi_nomlari = dict(Murojaat.JINSI)
+    jinsi_stat = [
+        {'jinsi': jinsi_nomlari.get(row['jinsi'], row['jinsi'] or "Noma'lum"), 'soni': row['soni']}
+        for row in qs.values('jinsi').annotate(soni=Count('id')).order_by('-soni')
+    ]
+
+    # ── Yosh kesimida ──────────────────────────────────────────────────────────
+    yosh_buckets = [
+        (0, 17,  '18 yoshgacha'),
+        (18, 30, '18–30 yosh'),
+        (31, 45, '31–45 yosh'),
+        (46, 60, '46–60 yosh'),
+        (61, 200, '60 dan katta'),
+    ]
+    yosh_stat = [
+        {'guruh': label, 'soni': qs.filter(yosh__gte=lo, yosh__lte=hi).count()}
+        for lo, hi, label in yosh_buckets
+    ]
+    noma_yosh = qs.filter(yosh__isnull=True).count()
+    if noma_yosh:
+        yosh_stat.append({'guruh': "Noma'lum", 'soni': noma_yosh})
+
+    return Response({
+        'viloyatlar': viloyatlar,
+        'usul_stat':  usul_stat,
+        'jinsi_stat': jinsi_stat,
+        'yosh_stat':  yosh_stat,
+        'jami':       qs.count(),
+        'jami_zarar': float(qs.aggregate(j=Sum('zarar'))['j'] or 0),
+    })
+
+
 def _compute_kunlik_holati(start, end, group_ids, vf, group_field='viloyat_id'):
     """Kunlar kesimida guruh (viloyat yoki tuman) bo'yicha murojaatlar sonini hisoblaydi. Maksimal 31 kunlik oraliq."""
     d_start = datetime.strptime(start, '%Y-%m-%d').date()

@@ -80,6 +80,7 @@ urlpatterns = [
     path('murojaat/kasblar/',        views.murojaat_kasblar),
     path('murojaat/shablon/',        views.murojaat_shablon),
     path('murojaat/import/',         views.murojaat_import),
+    path('murojaat/statistika/',     views.murojaat_statistika),
     path('murojaat/hisobot/',        views.murojaat_hisobot),
     path('murojaat/hisobot/excel/',  views.murojaat_hisobot_excel),
     path('murojaat/kunlik-holati/',        views.murojaat_kunlik_holati),

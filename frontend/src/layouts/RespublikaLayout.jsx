@@ -40,7 +40,8 @@ const GROUPS = [
     label: 'Murojaatlar',
     icon: ShieldExclamationIcon,
     items: [
-      { to: '/respublika/murojaat', icon: ShieldExclamationIcon, label: 'Murojaatlar' },
+      { to: '/respublika/murojaat',            icon: ShieldExclamationIcon, label: 'Murojaatlar' },
+      { to: '/respublika/murojaat-statistika', icon: MapIcon,               label: 'Murojaat statistikasi' },
     ],
   },
   {

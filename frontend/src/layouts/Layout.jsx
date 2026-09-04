@@ -46,7 +46,8 @@ const GROUPS = [
     label: 'Murojaatlar',
     icon: ShieldExclamationIcon,
     items: [
-      { to: '/murojaat', icon: ShieldExclamationIcon, label: "Murojaatlar" },
+      { to: '/murojaat',            icon: ShieldExclamationIcon, label: "Murojaatlar" },
+      { to: '/murojaat-statistika', icon: MapIcon,                label: "Murojaat statistikasi" },
     ],
   },
   {
