@@ -246,6 +246,9 @@ def tasdiqlash(request):
     Hisobot.objects.filter(id__in=t_ids).update(status=2)
     Hisobot.objects.filter(id__in=r_ids).update(status=3)
 
+    # Yuboriladigan xabarlarni oldindan (DB so'rovlari bilan) tayyorlaymiz,
+    # keyin faqat tarmoq so'rovlarini (tg_send) parallel bajaramiz.
+    xabarlar = []  # [(chat_id, text, reply_to), ...]
     for h in Hisobot.objects.filter(id__in=allowed).select_related('mahalla'):
         if h.status == 2:
             text = "✅ Targ'ibotingiz qabul qilindi!\nHamkorlik uchun rahmat 🙏"
@@ -256,11 +259,15 @@ def tasdiqlash(request):
                 text += f"\n\n📝 Sabab: {sabab}"
 
         # Yangi: Inspektor.tg_id orqali xabar
-        for ins in Inspektor.objects.filter(mahalla=h.mahalla, tg_id__gt=0, is_active=True):
-            tg_send(ins.tg_id, text, h.message_id)
+        aktiv_inspektorlar = list(Inspektor.objects.filter(mahalla=h.mahalla, tg_id__gt=0, is_active=True))
+        for ins in aktiv_inspektorlar:
+            xabarlar.append((ins.tg_id, text, h.message_id))
         # Legacy: Mahalla.tg_id (faqat active inspektor bo'lmasa)
-        if h.mahalla.tg_id > 0 and not Inspektor.objects.filter(mahalla=h.mahalla, tg_id__gt=0, is_active=True).exists():
-            tg_send(h.mahalla.tg_id, text, h.message_id)
+        if h.mahalla.tg_id > 0 and not aktiv_inspektorlar:
+            xabarlar.append((h.mahalla.tg_id, text, h.message_id))
+
+    with ThreadPoolExecutor(max_workers=20) as ex:
+        list(ex.map(lambda x: tg_send(*x), xabarlar))
 
     # ── Rad etilgan hisobotlar rasmlarini diskdan o'chirish ──────────────────
     if r_ids:
