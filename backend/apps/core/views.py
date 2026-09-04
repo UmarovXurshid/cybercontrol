@@ -2813,14 +2813,32 @@ def murojaat_hisobot(request):
 @permission_classes([IsAuthenticated])
 def murojaat_statistika(request):
     """Murojaatlar bo'yicha infografika: viloyat/tuman kesimida xarita, usul/jinsi/yosh kesimida taqsimot."""
-    start = request.GET.get('start')
-    end   = request.GET.get('end')
+    start   = request.GET.get('start')
+    end     = request.GET.get('end')
+    viloyat = request.GET.get('viloyat_id')
+    tuman   = request.GET.get('tuman_id')
+    kasb    = request.GET.get('kasb_id')
+    usul    = request.GET.get('usul_id')
+    yosh_min = request.GET.get('yosh_min')
+    yosh_max = request.GET.get('yosh_max')
     vf = get_viloyat_qs_filter(request, 'viloyat_id')
     qs = Murojaat.objects.filter(**vf)
     if start:
         qs = qs.filter(sana__gte=start)
     if end:
         qs = qs.filter(sana__lte=end)
+    if viloyat:
+        qs = qs.filter(viloyat_id=viloyat)
+    if tuman:
+        qs = qs.filter(tuman_id=tuman)
+    if kasb:
+        qs = qs.filter(Q(kasb_id=kasb) | Q(kasb__ota_id=kasb))
+    if usul:
+        qs = qs.filter(Q(usul_id=usul) | Q(usul__ota_id=usul))
+    if yosh_min:
+        qs = qs.filter(yosh__gte=yosh_min)
+    if yosh_max:
+        qs = qs.filter(yosh__lte=yosh_max)
 
     # ── Viloyat va tuman kesimida (xarita uchun) ──────────────────────────────
     viloyat_rows = list(

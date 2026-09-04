@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import api from '../api'
 import toast from 'react-hot-toast'
+import { MurojaatStatBlok } from './MurojaatStatistika'
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -413,6 +414,10 @@ export default function Murojaat() {
   const [jamiSoni,  setJamiSoni]  = useState(0)
   const PAGE_SIZE = 500
 
+  const [tab,         setTab]         = useState('royxat')   // 'royxat' | 'statistika'
+  const [statData,    setStatData]    = useState(null)
+  const [statLoading, setStatLoading] = useState(false)
+
   useEffect(() => {
     if (role === 'respublika') api.get('/viloyatlar/').then(r => setViloyatlar(r.data.results || r.data))
     api.get('/tumanlar/').then(r => setTumanlar(r.data.results || r.data))
@@ -451,18 +456,23 @@ export default function Murojaat() {
     }
   }, [form.tuman])
 
+  const buildFilterParams = (f) => {
+    const params = new URLSearchParams()
+    if (f.start)      params.append('start', f.start)
+    if (f.end)        params.append('end', f.end)
+    if (f.viloyat_id) params.append('viloyat_id', f.viloyat_id)
+    if (f.tuman_id)   params.append('tuman_id', f.tuman_id)
+    if (f.kasb_id)    params.append('kasb_id', f.kasb_id)
+    if (f.usul_id)    params.append('usul_id', f.usul_id)
+    if (f.yosh_min)   params.append('yosh_min', f.yosh_min)
+    if (f.yosh_max)   params.append('yosh_max', f.yosh_max)
+    return params
+  }
+
   const loadList = async (f = filter, p = 1) => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      if (f.start)      params.append('start', f.start)
-      if (f.end)        params.append('end', f.end)
-      if (f.viloyat_id) params.append('viloyat_id', f.viloyat_id)
-      if (f.tuman_id)   params.append('tuman_id', f.tuman_id)
-      if (f.kasb_id)    params.append('kasb_id', f.kasb_id)
-      if (f.usul_id)    params.append('usul_id', f.usul_id)
-      if (f.yosh_min)   params.append('yosh_min', f.yosh_min)
-      if (f.yosh_max)   params.append('yosh_max', f.yosh_max)
+      const params = buildFilterParams(f)
       params.append('page', p)
       params.append('page_size', PAGE_SIZE)
       const { data } = await api.get(`/murojaat/?${params}`)
@@ -473,18 +483,25 @@ export default function Murojaat() {
     finally { setLoading(false) }
   }
 
+  const loadStat = async (f = filter) => {
+    setStatLoading(true)
+    try {
+      const params = buildFilterParams(f)
+      const { data } = await api.get(`/murojaat/statistika/?${params}`)
+      setStatData(data)
+    } catch { toast.error('Statistika yuklanmadi') }
+    finally { setStatLoading(false) }
+  }
+
+  const qidirish = (f = filter) => {
+    loadList(f, 1)
+    if (tab === 'statistika' || statData) loadStat(f)
+  }
+
   const exportExcel = async () => {
     setExporting(true)
     try {
-      const params = new URLSearchParams()
-      if (filter.start)      params.append('start', filter.start)
-      if (filter.end)        params.append('end', filter.end)
-      if (filter.viloyat_id) params.append('viloyat_id', filter.viloyat_id)
-      if (filter.tuman_id)   params.append('tuman_id', filter.tuman_id)
-      if (filter.kasb_id)    params.append('kasb_id', filter.kasb_id)
-      if (filter.usul_id)    params.append('usul_id', filter.usul_id)
-      if (filter.yosh_min)   params.append('yosh_min', filter.yosh_min)
-      if (filter.yosh_max)   params.append('yosh_max', filter.yosh_max)
+      const params = buildFilterParams(filter)
       params.append('excel', '1')
       const token = localStorage.getItem('token')
       const res = await fetch(`/api/murojaat/?${params}`, {
@@ -797,8 +814,8 @@ export default function Murojaat() {
           <input type="number" min="0" max="120" value={filter.yosh_max}
             onChange={e => setFilter(p => ({ ...p, yosh_max: e.target.value }))} className="input-field w-24"/>
         </div>
-        <button onClick={() => loadList(filter, 1)} className="btn-primary">🔍 Qidirish</button>
-        <button onClick={() => { const f = { start:'', end:'', viloyat_id:'', tuman_id:'', kasb_id:'', usul_id:'', yosh_min:'', yosh_max:'' }; setFilter(f); loadList(f, 1) }}
+        <button onClick={() => qidirish(filter)} className="btn-primary">🔍 Qidirish</button>
+        <button onClick={() => { const f = { start:'', end:'', viloyat_id:'', tuman_id:'', kasb_id:'', usul_id:'', yosh_min:'', yosh_max:'' }; setFilter(f); qidirish(f) }}
           className="px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
           ✕ Tozalash
         </button>
@@ -808,8 +825,25 @@ export default function Murojaat() {
         </button>
       </div>
 
-      {/* ── Jadval ── */}
-      {loading ? (
+      {/* ── Tablar: Ro'yxat / Statistika ── */}
+      <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-xl w-fit">
+        {[
+          { key: 'royxat',     label: '📋 Ro\'yxat' },
+          { key: 'statistika', label: '📊 Statistika' },
+        ].map(t => (
+          <button key={t.key}
+            onClick={() => { setTab(t.key); if (t.key === 'statistika' && !statData) loadStat(filter) }}
+            className={`px-5 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
+              tab === t.key ? 'bg-white shadow text-indigo-700 font-semibold' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'statistika' ? (
+        <MurojaatStatBlok data={statData} loading={statLoading}/>
+      ) : loading ? (
         <div className="text-center py-16 text-gray-400">Yuklanmoqda...</div>
       ) : (
         <div className="card overflow-hidden p-0">

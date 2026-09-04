@@ -55,7 +55,9 @@ function clr(ratio) {
 
 const COLORS = ['#4f46e5', '#0ea5e9', '#f97316', '#22c55e', '#e11d48', '#a855f7', '#eab308', '#14b8a6']
 
-function FitBounds({ geoJson }) {
+export { COLORS }
+
+export function FitBounds({ geoJson }) {
   const map = useMap()
   useEffect(() => {
     if (!geoJson) return
@@ -67,7 +69,7 @@ function FitBounds({ geoJson }) {
   return null
 }
 
-function XaritaBlok({ viloyatlar }) {
+export function XaritaBlok({ viloyatlar }) {
   const [geoJson, setGeoJson] = useState(null)
   const [geoErr, setGeoErr]   = useState(false)
   const [geoLoad, setGeoLoad] = useState(true)
@@ -179,11 +181,96 @@ function XaritaBlok({ viloyatlar }) {
   )
 }
 
-function ChartCard({ title, children }) {
+export function ChartCard({ title, children }) {
   return (
     <div className="card">
       <h3 className="text-sm font-semibold text-gray-700 mb-3">{title}</h3>
       {children}
+    </div>
+  )
+}
+
+export function MurojaatStatBlok({ data, loading }) {
+  const usulPie  = useMemo(() => (data?.usul_stat  || []).map(u => ({ name: u.nomi,  value: u.soni })), [data])
+  const jinsiPie = useMemo(() => (data?.jinsi_stat || []).map(j => ({ name: j.jinsi, value: j.soni })), [data])
+  const yoshBar  = useMemo(() => (data?.yosh_stat  || []).map(y => ({ name: y.guruh, soni: y.soni })),  [data])
+
+  if (loading) {
+    return (
+      <div className="card text-center py-16 text-gray-400">
+        <div className="text-4xl mb-3 animate-pulse">⏳</div>
+        <div className="text-lg">Yuklanmoqda...</div>
+      </div>
+    )
+  }
+  if (!data || data.jami === 0) {
+    return (
+      <div className="card text-center py-16 text-gray-400">
+        <div className="text-5xl mb-3">📭</div>
+        <div className="text-lg font-medium">Ma'lumot topilmadi</div>
+        <div className="text-sm mt-1">Boshqa filtr / sana oralig'ini tanlang</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex gap-4 text-sm">
+        <div className="text-right">
+          <div className="text-xl font-black text-indigo-600 tabular-nums">{data.jami}</div>
+          <div className="text-xs text-gray-500">jami murojaat</div>
+        </div>
+        <div className="text-right">
+          <div className="text-xl font-black text-red-600 tabular-nums">{data.jami_zarar.toLocaleString()}</div>
+          <div className="text-xs text-gray-500">jami zarar (so'm)</div>
+        </div>
+      </div>
+
+      {/* Shahar/tuman kesimida xarita */}
+      <div className="card">
+        <h2 className="text-base font-semibold text-gray-800 mb-4">🗺️ Viloyat va tuman kesimida</h2>
+        <XaritaBlok viloyatlar={data.viloyatlar}/>
+      </div>
+
+      {/* Usul / Jinsi / Yosh kesimida */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <ChartCard title="🎭 Sodir etish usuli kesimida">
+          <ResponsiveContainer width="100%" height={280}>
+            <PieChart>
+              <Pie data={usulPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}
+                label={({ percent }) => `${(percent * 100).toFixed(0)}%`}>
+                {usulPie.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]}/>)}
+              </Pie>
+              <Tooltip/>
+              <Legend wrapperStyle={{ fontSize: 11 }}/>
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="👥 Jinsi kesimida">
+          <ResponsiveContainer width="100%" height={280}>
+            <PieChart>
+              <Pie data={jinsiPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}
+                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                {jinsiPie.map((_, i) => <Cell key={i} fill={i === 0 ? '#4f46e5' : '#e11d48'}/>)}
+              </Pie>
+              <Tooltip/>
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="🎂 Yoshi kesimida">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={yoshBar} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3"/>
+              <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={50}/>
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false}/>
+              <Tooltip/>
+              <Bar dataKey="soni" fill="#0ea5e9" radius={[4, 4, 0, 0]}/>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
     </div>
   )
 }
@@ -205,10 +292,6 @@ export default function MurojaatStatistika() {
   }
   useEffect(() => { load() }, [])
 
-  const usulPie  = useMemo(() => (data?.usul_stat  || []).map(u => ({ name: u.nomi,  value: u.soni })), [data])
-  const jinsiPie = useMemo(() => (data?.jinsi_stat || []).map(j => ({ name: j.jinsi, value: j.soni })), [data])
-  const yoshBar  = useMemo(() => (data?.yosh_stat  || []).map(y => ({ name: y.guruh, soni: y.soni })),  [data])
-
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">📊 Murojaatlar statistikasi</h1>
@@ -223,80 +306,9 @@ export default function MurojaatStatistika() {
           <input type="date" value={end} onChange={e => setEnd(e.target.value)} className="input-field w-40"/>
         </div>
         <button onClick={load} disabled={loading} className="btn-primary">{loading ? '⏳' : '🔍'} Ko'rsatish</button>
-        {data && (
-          <div className="ml-auto flex gap-4 text-sm">
-            <div className="text-right">
-              <div className="text-xl font-black text-indigo-600 tabular-nums">{data.jami}</div>
-              <div className="text-xs text-gray-500">jami murojaat</div>
-            </div>
-            <div className="text-right">
-              <div className="text-xl font-black text-red-600 tabular-nums">{data.jami_zarar.toLocaleString()}</div>
-              <div className="text-xs text-gray-500">jami zarar (so'm)</div>
-            </div>
-          </div>
-        )}
       </div>
 
-      {loading ? (
-        <div className="card text-center py-16 text-gray-400">
-          <div className="text-4xl mb-3 animate-pulse">⏳</div>
-          <div className="text-lg">Yuklanmoqda...</div>
-        </div>
-      ) : !data || data.jami === 0 ? (
-        <div className="card text-center py-16 text-gray-400">
-          <div className="text-5xl mb-3">📭</div>
-          <div className="text-lg font-medium">Ma'lumot topilmadi</div>
-          <div className="text-sm mt-1">Boshqa sana oralig'ini tanlang</div>
-        </div>
-      ) : (
-        <div className="space-y-5">
-          {/* Shahar/tuman kesimida xarita */}
-          <div className="card">
-            <h2 className="text-base font-semibold text-gray-800 mb-4">🗺️ Viloyat va tuman kesimida</h2>
-            <XaritaBlok viloyatlar={data.viloyatlar}/>
-          </div>
-
-          {/* Usul / Jinsi / Yosh kesimida */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            <ChartCard title="🎭 Sodir etish usuli kesimida">
-              <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
-                  <Pie data={usulPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}
-                    label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}>
-                    {usulPie.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]}/>)}
-                  </Pie>
-                  <Tooltip/>
-                  <Legend wrapperStyle={{ fontSize: 11 }}/>
-                </PieChart>
-              </ResponsiveContainer>
-            </ChartCard>
-
-            <ChartCard title="👥 Jinsi kesimida">
-              <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
-                  <Pie data={jinsiPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                    {jinsiPie.map((_, i) => <Cell key={i} fill={i === 0 ? '#4f46e5' : '#e11d48'}/>)}
-                  </Pie>
-                  <Tooltip/>
-                </PieChart>
-              </ResponsiveContainer>
-            </ChartCard>
-
-            <ChartCard title="🎂 Yoshi kesimida">
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={yoshBar} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3"/>
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={50}/>
-                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false}/>
-                  <Tooltip/>
-                  <Bar dataKey="soni" fill="#0ea5e9" radius={[4, 4, 0, 0]}/>
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-          </div>
-        </div>
-      )}
+      <MurojaatStatBlok data={data} loading={loading}/>
     </div>
   )
 }
