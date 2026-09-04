@@ -191,7 +191,14 @@ export function ChartCard({ title, children }) {
 }
 
 export function MurojaatStatBlok({ data, loading }) {
-  const usulPie   = useMemo(() => (data?.usul_stat  || []).map(u => ({ name: u.nomi,  value: u.soni })), [data])
+  const usulPie   = useMemo(() => {
+    const sorted = [...(data?.usul_stat || [])].sort((a, b) => b.soni - a.soni)
+    const TOP_N = 6
+    const top = sorted.slice(0, TOP_N).map(u => ({ name: u.nomi, value: u.soni }))
+    const rest = sorted.slice(TOP_N).reduce((s, u) => s + u.soni, 0)
+    if (rest > 0) top.push({ name: 'Boshqalar', value: rest })
+    return top
+  }, [data])
   const jinsiPie  = useMemo(() => (data?.jinsi_stat || []).map(j => ({ name: j.jinsi, value: j.soni })), [data])
   const yoshBar   = useMemo(() => (data?.yosh_stat  || []).map(y => ({ name: y.guruh, soni: y.soni })),  [data])
   const viloyatBar = useMemo(
@@ -238,15 +245,15 @@ export function MurojaatStatBlok({ data, loading }) {
         <XaritaBlok viloyatlar={data.viloyatlar}/>
       </div>
 
-      {/* Viloyatlar kesimida — ustunli diagramma (reyting) */}
+      {/* Viloyatlar kesimida — ustunli diagramma (reyting, tartiblangan) */}
       <ChartCard title="🏛️ Viloyatlar kesimida (murojaatlar soni)">
-        <ResponsiveContainer width="100%" height={Math.max(260, viloyatBar.length * 34)}>
-          <BarChart data={viloyatBar} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+        <ResponsiveContainer width="100%" height={360}>
+          <BarChart data={viloyatBar} margin={{ top: 5, right: 20, left: -10, bottom: 60 }}>
             <CartesianGrid strokeDasharray="3 3"/>
-            <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }}/>
-            <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={140}/>
+            <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-45} textAnchor="end" height={80}/>
+            <YAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }}/>
             <Tooltip formatter={(value, name) => name === 'zarar' ? [`${value.toLocaleString()} so'm`, 'Jami zarar'] : [value, 'Murojaatlar soni']}/>
-            <Bar dataKey="soni" fill="#4f46e5" radius={[0, 4, 4, 0]}/>
+            <Bar dataKey="soni" fill="#4f46e5" radius={[4, 4, 0, 0]}/>
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
@@ -254,14 +261,24 @@ export function MurojaatStatBlok({ data, loading }) {
       {/* Usul / Jinsi / Yosh kesimida */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <ChartCard title="🎭 Sodir etish usuli kesimida">
-          <ResponsiveContainer width="100%" height={280}>
+          <ResponsiveContainer width="100%" height={360}>
             <PieChart>
-              <Pie data={usulPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}
-                label={({ percent }) => `${(percent * 100).toFixed(0)}%`}>
+              <Pie data={usulPie} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={80} labelLine={false}>
                 {usulPie.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]}/>)}
               </Pie>
-              <Tooltip/>
-              <Legend wrapperStyle={{ fontSize: 11 }}/>
+              <Tooltip formatter={(value, name) => [value, name]}/>
+              <Legend
+                wrapperStyle={{ fontSize: 10, lineHeight: '16px' }}
+                layout="vertical"
+                verticalAlign="bottom"
+                align="center"
+                formatter={(value, entry) => {
+                  const total = usulPie.reduce((s, u) => s + u.value, 0)
+                  const pct = total ? ((entry.payload.value / total) * 100).toFixed(0) : 0
+                  const short = value.length > 28 ? value.slice(0, 28) + '…' : value
+                  return `${short} (${pct}%)`
+                }}
+              />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
