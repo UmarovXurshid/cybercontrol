@@ -2302,15 +2302,36 @@ def murojaat_list_create(request):
                 ])
             viloyat_stat = (
                 qs.values('viloyat__nomi')
-                  .annotate(soni=Count('id'), zarar_jami=Sum('zarar'))
+                  .annotate(
+                      soni=Count('id'),
+                      zarar_jami=Sum('zarar'),
+                      erkak_soni=Count('id', filter=Q(jinsi='erkak')),
+                      ayol_soni=Count('id', filter=Q(jinsi='ayol')),
+                      yosh_45_gacha=Count('id', filter=Q(yosh__lte=45)),
+                      yosh_45_dan_katta=Count('id', filter=Q(yosh__gt=45)),
+                  )
                   .order_by('-soni')
             )
-            stat_headers = ['#', 'Viloyat', 'Murojaatlar soni', 'Jami zarar (so\'m)']
+            stat_headers = ['#', 'Viloyat', 'Murojaatlar soni', 'Jami zarar (so\'m)',
+                             'Erkaklar soni', 'Ayollar soni',
+                             '45 yoshgacha (nafaqaga yetmagan)', '45 yoshdan katta (nafaqadagi)']
             stat_data = [
-                [i, s['viloyat__nomi'] or '—', s['soni'], float(s['zarar_jami'] or 0)]
+                [i, s['viloyat__nomi'] or '—', s['soni'], float(s['zarar_jami'] or 0),
+                 s['erkak_soni'], s['ayol_soni'], s['yosh_45_gacha'], s['yosh_45_dan_katta']]
                 for i, s in enumerate(viloyat_stat, 1)
             ]
-            stat_data.append(['', 'JAMI', qs.count(), float(qs.aggregate(j=Sum('zarar'))['j'] or 0)])
+            jami_agg = qs.aggregate(
+                zarar_jami=Sum('zarar'),
+                erkak_soni=Count('id', filter=Q(jinsi='erkak')),
+                ayol_soni=Count('id', filter=Q(jinsi='ayol')),
+                yosh_45_gacha=Count('id', filter=Q(yosh__lte=45)),
+                yosh_45_dan_katta=Count('id', filter=Q(yosh__gt=45)),
+            )
+            stat_data.append([
+                '', 'JAMI', qs.count(), float(jami_agg['zarar_jami'] or 0),
+                jami_agg['erkak_soni'], jami_agg['ayol_soni'],
+                jami_agg['yosh_45_gacha'], jami_agg['yosh_45_dan_katta'],
+            ])
 
             audit(request, 'excel_yuklab_olish', f"Murojaatlar ro'yxati ({len(data)} ta)")
             return excel_response(
