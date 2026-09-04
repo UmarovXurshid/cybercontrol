@@ -2245,6 +2245,10 @@ def murojaat_list_create(request):
         end     = request.GET.get('end')
         viloyat = request.GET.get('viloyat_id')
         tuman   = request.GET.get('tuman_id')
+        kasb    = request.GET.get('kasb_id')
+        usul    = request.GET.get('usul_id')
+        yosh_min = request.GET.get('yosh_min')
+        yosh_max = request.GET.get('yosh_max')
         qs = Murojaat.objects.filter(**vf).select_related('viloyat', 'tuman', 'mahalla', 'usul', 'kasb')
         if start:
             qs = qs.filter(sana__gte=start)
@@ -2254,8 +2258,41 @@ def murojaat_list_create(request):
             qs = qs.filter(viloyat_id=viloyat)
         if tuman:
             qs = qs.filter(tuman_id=tuman)
+        if kasb:
+            qs = qs.filter(Q(kasb_id=kasb) | Q(kasb__ota_id=kasb))
+        if usul:
+            qs = qs.filter(Q(usul_id=usul) | Q(usul__ota_id=usul))
+        if yosh_min:
+            qs = qs.filter(yosh__gte=yosh_min)
+        if yosh_max:
+            qs = qs.filter(yosh__lte=yosh_max)
 
         qs = qs.order_by('-sana', '-id')
+
+        if request.GET.get('excel'):
+            headers = ['#', 'Sana', 'Viloyat', 'Tuman', 'Mahalla', 'F.I.SH', 'Jinsi', 'Yoshi',
+                       'Kasbi', 'Kasb izohi/Muassasa', 'Usuli', 'Ijtimoiy tarmoq',
+                       'Zarar (so\'m)', 'Holat', 'Fabula']
+            holat_nomlari = dict(Murojaat.HOLAT)
+            jinsi_nomlari = dict(Murojaat.JINSI)
+            data = []
+            for i, m in enumerate(qs, 1):
+                kasb_izoh = m.kasb_izoh or ''
+                if m.kasb_muassasa:
+                    kasb_izoh = (kasb_izoh + ' ' + m.kasb_muassasa).strip()
+                data.append([
+                    i, str(m.sana), m.viloyat.nomi if m.viloyat_id else '',
+                    m.tuman.tuman_nomi if m.tuman_id else '',
+                    m.mahalla.mahalla_nomi if m.mahalla_id else '',
+                    m.fish, jinsi_nomlari.get(m.jinsi, m.jinsi), m.yosh,
+                    m.kasb.nomi if m.kasb_id else '', kasb_izoh,
+                    m.usul.nomi if m.usul_id else '', m.ijtimoiy_tarmoq,
+                    float(m.zarar) if m.zarar is not None else '',
+                    holat_nomlari.get(m.holat, m.holat), m.fabula,
+                ])
+            audit(request, 'excel_yuklab_olish', f"Murojaatlar ro'yxati ({len(data)} ta)")
+            return excel_response(headers, data, 'murojaatlar.xlsx')
+
         jami = qs.count()
         try:
             page      = max(1, int(request.GET.get('page', 1)))

@@ -405,7 +405,8 @@ export default function Murojaat() {
   const [formVersion, setFormVersion] = useState(0)
   const [editId,    setEditId]    = useState(null)
   const [loading,   setLoading]   = useState(false)
-  const [filter,    setFilter]    = useState({ start: '', end: '', viloyat_id: '', tuman_id: '' })
+  const [filter,    setFilter]    = useState({ start: '', end: '', viloyat_id: '', tuman_id: '', kasb_id: '', usul_id: '', yosh_min: '', yosh_max: '' })
+  const [exporting, setExporting] = useState(false)
   const [korishObj, setKorishObj] = useState(null)
   const [fishMatch, setFishMatch] = useState({ topildi: false, natijalar: [] })
   const [page,      setPage]      = useState(1)
@@ -424,6 +425,24 @@ export default function Murojaat() {
     ? tumanlar.filter(t => String(t.viloyat) === String(filter.viloyat_id))
     : tumanlar
 
+  // Hierarxik ro'yxatni (usul/kasb) filtr uchun tekis, chuqurlik bo'yicha chekinishli ro'yxatga aylantiradi
+  const flattenForFilter = list => {
+    const byOta = {}
+    list.forEach(it => { const k = it.ota_id ?? 'root'; (byOta[k] ||= []).push(it) })
+    Object.values(byOta).forEach(arr => arr.sort((a, b) => a.tartib - b.tartib))
+    const out = []
+    const walk = (otaId, depth) => {
+      (byOta[otaId ?? 'root'] || []).forEach(it => {
+        out.push({ id: it.id, label: '\u00A0\u00A0'.repeat(depth) + (depth > 0 ? '— ' : '') + it.nomi })
+        walk(it.id, depth + 1)
+      })
+    }
+    walk(null, 0)
+    return out
+  }
+  const usulFilterOptions = useMemo(() => flattenForFilter(usullar), [usullar])
+  const kasbFilterOptions = useMemo(() => flattenForFilter(kasblar), [kasblar])
+
   useEffect(() => {
     if (form.tuman) {
       api.get(`/mahallalar/?tuman_id=${form.tuman}`).then(r => setMahallalar(r.data.results || r.data))
@@ -440,6 +459,10 @@ export default function Murojaat() {
       if (f.end)        params.append('end', f.end)
       if (f.viloyat_id) params.append('viloyat_id', f.viloyat_id)
       if (f.tuman_id)   params.append('tuman_id', f.tuman_id)
+      if (f.kasb_id)    params.append('kasb_id', f.kasb_id)
+      if (f.usul_id)    params.append('usul_id', f.usul_id)
+      if (f.yosh_min)   params.append('yosh_min', f.yosh_min)
+      if (f.yosh_max)   params.append('yosh_max', f.yosh_max)
       params.append('page', p)
       params.append('page_size', PAGE_SIZE)
       const { data } = await api.get(`/murojaat/?${params}`)
@@ -448,6 +471,35 @@ export default function Murojaat() {
       setPage(p)
     } catch { toast.error('Yuklab bo\'lmadi') }
     finally { setLoading(false) }
+  }
+
+  const exportExcel = async () => {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams()
+      if (filter.start)      params.append('start', filter.start)
+      if (filter.end)        params.append('end', filter.end)
+      if (filter.viloyat_id) params.append('viloyat_id', filter.viloyat_id)
+      if (filter.tuman_id)   params.append('tuman_id', filter.tuman_id)
+      if (filter.kasb_id)    params.append('kasb_id', filter.kasb_id)
+      if (filter.usul_id)    params.append('usul_id', filter.usul_id)
+      if (filter.yosh_min)   params.append('yosh_min', filter.yosh_min)
+      if (filter.yosh_max)   params.append('yosh_max', filter.yosh_max)
+      params.append('excel', '1')
+      const token = localStorage.getItem('token')
+      const res = await fetch(`/api/murojaat/?${params}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) throw new Error('Xato')
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url
+      a.download = 'murojaatlar.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch { toast.error('Yuklab bo\'lmadi') }
+    finally { setExporting(false) }
   }
 
   const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }))
@@ -719,10 +771,40 @@ export default function Murojaat() {
             {filterTumanlar.map(t => <option key={t.id} value={t.id}>{t.tuman_nomi}</option>)}
           </select>
         </div>
+        <div>
+          <label className="form-label">Kasb</label>
+          <select value={filter.kasb_id}
+            onChange={e => setFilter(p => ({ ...p, kasb_id: e.target.value }))} className="input-field w-56">
+            <option value="">Barchasi</option>
+            {kasbFilterOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="form-label">Sodir etish usuli</label>
+          <select value={filter.usul_id}
+            onChange={e => setFilter(p => ({ ...p, usul_id: e.target.value }))} className="input-field w-56">
+            <option value="">Barchasi</option>
+            {usulFilterOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="form-label">Yoshi (dan)</label>
+          <input type="number" min="0" max="120" value={filter.yosh_min}
+            onChange={e => setFilter(p => ({ ...p, yosh_min: e.target.value }))} className="input-field w-24"/>
+        </div>
+        <div>
+          <label className="form-label">Yoshi (gacha)</label>
+          <input type="number" min="0" max="120" value={filter.yosh_max}
+            onChange={e => setFilter(p => ({ ...p, yosh_max: e.target.value }))} className="input-field w-24"/>
+        </div>
         <button onClick={() => loadList(filter, 1)} className="btn-primary">🔍 Qidirish</button>
-        <button onClick={() => { const f = { start:'', end:'', viloyat_id:'', tuman_id:'' }; setFilter(f); loadList(f, 1) }}
+        <button onClick={() => { const f = { start:'', end:'', viloyat_id:'', tuman_id:'', kasb_id:'', usul_id:'', yosh_min:'', yosh_max:'' }; setFilter(f); loadList(f, 1) }}
           className="px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
           ✕ Tozalash
+        </button>
+        <button onClick={exportExcel} disabled={exporting}
+          className="px-4 py-2 border border-green-300 rounded-xl text-sm text-green-700 bg-green-50 hover:bg-green-100">
+          {exporting ? '⏳ Yuklanmoqda...' : '⬇️ Excel yuklab olish'}
         </button>
       </div>
 
