@@ -191,9 +191,15 @@ export function ChartCard({ title, children }) {
 }
 
 export function MurojaatStatBlok({ data, loading }) {
-  const usulPie  = useMemo(() => (data?.usul_stat  || []).map(u => ({ name: u.nomi,  value: u.soni })), [data])
-  const jinsiPie = useMemo(() => (data?.jinsi_stat || []).map(j => ({ name: j.jinsi, value: j.soni })), [data])
-  const yoshBar  = useMemo(() => (data?.yosh_stat  || []).map(y => ({ name: y.guruh, soni: y.soni })),  [data])
+  const usulPie   = useMemo(() => (data?.usul_stat  || []).map(u => ({ name: u.nomi,  value: u.soni })), [data])
+  const jinsiPie  = useMemo(() => (data?.jinsi_stat || []).map(j => ({ name: j.jinsi, value: j.soni })), [data])
+  const yoshBar   = useMemo(() => (data?.yosh_stat  || []).map(y => ({ name: y.guruh, soni: y.soni })),  [data])
+  const viloyatBar = useMemo(
+    () => [...(data?.viloyatlar || [])]
+      .sort((a, b) => b.soni - a.soni)
+      .map(v => ({ name: v.nomi.replace(/ viloyati$/i, '').replace(/ shahri$/i, ''), soni: v.soni, zarar: v.zarar_jami })),
+    [data]
+  )
 
   if (loading) {
     return (
@@ -231,6 +237,19 @@ export function MurojaatStatBlok({ data, loading }) {
         <h2 className="text-base font-semibold text-gray-800 mb-4">🗺️ Viloyat va tuman kesimida</h2>
         <XaritaBlok viloyatlar={data.viloyatlar}/>
       </div>
+
+      {/* Viloyatlar kesimida — ustunli diagramma (reyting) */}
+      <ChartCard title="🏛️ Viloyatlar kesimida (murojaatlar soni)">
+        <ResponsiveContainer width="100%" height={Math.max(260, viloyatBar.length * 34)}>
+          <BarChart data={viloyatBar} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3"/>
+            <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }}/>
+            <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={140}/>
+            <Tooltip formatter={(value, name) => name === 'zarar' ? [`${value.toLocaleString()} so'm`, 'Jami zarar'] : [value, 'Murojaatlar soni']}/>
+            <Bar dataKey="soni" fill="#4f46e5" radius={[0, 4, 4, 0]}/>
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartCard>
 
       {/* Usul / Jinsi / Yosh kesimida */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
