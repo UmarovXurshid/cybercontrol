@@ -47,12 +47,7 @@ def audit(request, amal, tavsif=''):
         pass
 
 # ── Excel eksport yordamchi ───────────────────────────────────────────────────
-def excel_response(headers, rows, filename):
-    """Chiroyli Excel fayl qaytaradi."""
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = 'Hisobot'
-
+def _fill_sheet(ws, headers, rows):
     header_font = Font(bold=True, color='FFFFFF')
     header_fill = PatternFill('solid', fgColor='3730A3')  # indigo
     center      = Alignment(horizontal='center', vertical='center')
@@ -74,6 +69,21 @@ def excel_response(headers, rows, filename):
     for col in ws.columns:
         max_len = max((len(str(c.value or '')) for c in col), default=0)
         ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+
+
+def excel_response(headers, rows, filename, extra_sheet=None):
+    """Chiroyli Excel fayl qaytaradi.
+    extra_sheet: ixtiyoriy (sheet_nomi, headers2, rows2) — 2-list qo'shish uchun.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Hisobot'
+    _fill_sheet(ws, headers, rows)
+
+    if extra_sheet:
+        sheet_nomi, headers2, rows2 = extra_sheet
+        ws2 = wb.create_sheet(title=sheet_nomi)
+        _fill_sheet(ws2, headers2, rows2)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -2290,8 +2300,23 @@ def murojaat_list_create(request):
                     float(m.zarar) if m.zarar is not None else '',
                     holat_nomlari.get(m.holat, m.holat), m.fabula,
                 ])
+            viloyat_stat = (
+                qs.values('viloyat__nomi')
+                  .annotate(soni=Count('id'), zarar_jami=Sum('zarar'))
+                  .order_by('-soni')
+            )
+            stat_headers = ['#', 'Viloyat', 'Murojaatlar soni', 'Jami zarar (so\'m)']
+            stat_data = [
+                [i, s['viloyat__nomi'] or '—', s['soni'], float(s['zarar_jami'] or 0)]
+                for i, s in enumerate(viloyat_stat, 1)
+            ]
+            stat_data.append(['', 'JAMI', qs.count(), float(qs.aggregate(j=Sum('zarar'))['j'] or 0)])
+
             audit(request, 'excel_yuklab_olish', f"Murojaatlar ro'yxati ({len(data)} ta)")
-            return excel_response(headers, data, 'murojaatlar.xlsx')
+            return excel_response(
+                headers, data, 'murojaatlar.xlsx',
+                extra_sheet=('Viloyatlar kesimida statistika', stat_headers, stat_data),
+            )
 
         jami = qs.count()
         try:
