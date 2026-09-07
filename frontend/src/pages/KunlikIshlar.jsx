@@ -457,7 +457,7 @@ export default function KunlikIshlar() {
     load()
   }
 
-  const jami_uchrashuv = bot.jami || [1,2,3,4,5,6,7,8,9,10]
+  const jami_uchrashuv = bot.jami || [1,2,14,15,3,4,5,6,7,8,9,10]
     .reduce((s, k) => s + (bot[`kat${k}`] || 0), 0)
 
   const canEdit = loaded && !isLocked && (isViloyat || (isRespublika && !!selViloyat))
@@ -554,7 +554,7 @@ export default function KunlikIshlar() {
             <>
             {/* ══════ 1-BO'LIM: UCHRASHUVLAR ══════ */}
             <Section title="1. O'tkazilgan uchrashuvlar soni (bot ma'lumotlari)" color="blue">
-              {[1,2,3,4,5,6,7,8,9,10].map(k => (
+              {[1,2,14,15,3,4,5,6,7,8,9,10].map(k => (
                 <BotRow key={k}
                   label={katNomlar[`kat${k}`] || `Kategoriya ${k}`}
                   val={bot[`kat${k}`] || 0} />

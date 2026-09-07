@@ -11,13 +11,12 @@ const KUNLAR = ['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma
 // 1-jadval: Uchrashuvlar + Qatnashchilar
 const J1 = [
   {
-    label: "O'tkazilgan uchrashuvlar soni", th: 'bg-blue-800', span: 10,
+    label: "O'tkazilgan uchrashuvlar soni", th: 'bg-blue-800', span: 9,
     cols: [
       { key: 'j',           label: 'JAMI' },
       { key: 'mfy',         label: 'MFY' },
       { key: 'oliy',        label: "Oliy ta'lim" },
-      { key: 'litsey',      label: 'Litsey' },
-      { key: 'orta',        label: "Maktab" },
+      { key: 'maktab',      label: "Maktablar" },
       { key: 'maktabgacha', label: 'Maktabgacha' },
       { key: 'kasalxona',   label: 'Kasalxona' },
       { key: 'bozor',       label: 'Bozor' },

@@ -23,4 +23,5 @@ class RasmAdmin(admin.ModelAdmin):
 
 @admin.register(TargibotUtkazilganJoy)
 class JoyAdmin(admin.ModelAdmin):
-    list_display = ('id', 'targibot_utkazilgan_joy', 'joy_turi')
+    list_display = ('id', 'targibot_utkazilgan_joy', 'joy_turi', 'kategoriya')
+    list_filter  = ('kategoriya', 'joy_turi')
