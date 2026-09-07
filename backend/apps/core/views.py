@@ -1999,8 +1999,8 @@ def kunlik_ishlar_excel(request):  # noqa: C901
     # ── Qator 3: Kategoriya sarlavhalari ──────────────────────────────────────
     # Uchrashuvlar — har biri 2 col (сони | бир кунда)
     uch_cats = [
-        'Маҳаллалар',       'Қизил МФЙлар',   "Oliy ta'lim\nmuassasalari",
-        'Maktablar',        "Maktabgacha\nta'lim",
+        'Маҳаллалар',       'Қизил МФЙлар',   "Олий таълим\nмуассасалари",
+        'Мактаблар',        "Мактабгача\nтаълим",
         'Касалхона',        'Бозорлар',        'Истироҳат\nбоғлари',
         'Жамоат\nтранспорти','Масжидлар',       'ҲМҚО',
         'Бошқа\n(Telegram)',
