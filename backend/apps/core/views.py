@@ -2291,7 +2291,7 @@ def murojaat_list_create(request):
         qs = qs.order_by('-sana', '-id')
 
         if request.GET.get('excel'):
-            headers = ['#', 'Sana', 'Viloyat', 'Tuman', 'Mahalla', 'F.I.SH', 'Jinsi', 'Yoshi',
+            headers = ['#', 'Sana', 'Viloyat', 'Tuman', 'Mahalla', 'F.I.SH', 'Telefon', 'Jinsi', 'Yoshi',
                        'Kasbi', 'Kasb izohi/Muassasa', 'Usuli', 'Ijtimoiy tarmoq',
                        'Zarar (so\'m)', 'Holat', 'Fabula']
             holat_nomlari = dict(Murojaat.HOLAT)
@@ -2305,7 +2305,7 @@ def murojaat_list_create(request):
                     i, str(m.sana), m.viloyat.nomi if m.viloyat_id else '',
                     m.tuman.tuman_nomi if m.tuman_id else '',
                     m.mahalla.mahalla_nomi if m.mahalla_id else '',
-                    m.fish, jinsi_nomlari.get(m.jinsi, m.jinsi), m.yosh,
+                    m.fish, m.telefon, jinsi_nomlari.get(m.jinsi, m.jinsi), m.yosh,
                     m.kasb.nomi if m.kasb_id else '', kasb_izoh,
                     m.usul.nomi if m.usul_id else '', m.ijtimoiy_tarmoq,
                     float(m.zarar) if m.zarar is not None else '',
