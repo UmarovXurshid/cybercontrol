@@ -50,7 +50,7 @@ export default function KunlikIshlarHisobot() {
 
   const bot = data?.bot || {}
   const katNomlar = data?.kat_nomlar || {}
-  const jamiUchrashuv = [1,2,14,15,3,4,5,6,7,8,9,10].reduce((s, k) => s + (bot[`kat${k}`] || 0), 0)
+  const jamiUchrashuv = [1,2,14,15,3,4,5,6,7,8,9,10,16].reduce((s, k) => s + (bot[`kat${k}`] || 0), 0)
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -80,7 +80,7 @@ export default function KunlikIshlarHisobot() {
 
           {/* 1. Uchrashuvlar — usul (joy turi) kesimi */}
           <Section title="1. O'tkazilgan uchrashuvlar soni — joy turi (usul) kesimi" color="blue">
-            {[1,2,14,15,3,4,5,6,7,8,9,10].map(k => (
+            {[1,2,14,15,3,4,5,6,7,8,9,10,16].map(k => (
               <Row key={k} label={katNomlar[`kat${k}`] || `Kategoriya ${k}`} val={bot[`kat${k}`] || 0} />
             ))}
             <Row label="IIO boshlig'i TV murojaati" val={data.iio_tv_murojaati || 0} />

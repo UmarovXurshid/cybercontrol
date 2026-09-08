@@ -288,8 +288,8 @@ function RespublikaListView({ sana, onSelect }) {
 const INFRA_FIELDS = [
   { field: 'qizil_mfy',        label: "Qizil MFYlar soni" },
   { field: 'oliy_talim',       label: "Oliy ta'lim muassasalari" },
-  { field: 'akademik_litsey',  label: "Akademik litseylar" },
-  { field: 'orta_talim',       label: "O'rta ta'lim muassasalari (maktab)" },
+  { field: 'akademik_litsey',  label: "Litsey va texnikumlar" },
+  { field: 'orta_talim',       label: "Maktablar" },
   { field: 'maktabgacha',      label: "Maktabgacha ta'lim muassasalari" },
   { field: 'kasalxona',        label: "Kasalxona va poliklinikalar" },
   { field: 'bozor',            label: "Bozorlar va yirik savdo majmualari" },
@@ -457,7 +457,7 @@ export default function KunlikIshlar() {
     load()
   }
 
-  const jami_uchrashuv = bot.jami || [1,2,14,15,3,4,5,6,7,8,9,10]
+  const jami_uchrashuv = bot.jami || [1,2,14,15,3,4,5,6,7,8,9,10,16]
     .reduce((s, k) => s + (bot[`kat${k}`] || 0), 0)
 
   const canEdit = loaded && !isLocked && (isViloyat || (isRespublika && !!selViloyat))
@@ -554,7 +554,7 @@ export default function KunlikIshlar() {
             <>
             {/* ══════ 1-BO'LIM: UCHRASHUVLAR ══════ */}
             <Section title="1. O'tkazilgan uchrashuvlar soni (bot ma'lumotlari)" color="blue">
-              {[1,2,14,15,3,4,5,6,7,8,9,10].map(k => (
+              {[1,2,14,15,3,4,5,6,7,8,9,10,16].map(k => (
                 <BotRow key={k}
                   label={katNomlar[`kat${k}`] || `Kategoriya ${k}`}
                   val={bot[`kat${k}`] || 0} />

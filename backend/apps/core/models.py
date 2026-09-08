@@ -53,6 +53,7 @@ class TargibotUtkazilganJoy(models.Model):
         (12,"Ijtimoiy tarmoqlar (onlayn)"),
         (14,'Мактаблар'),
         (15,'Мактабгача таълим ташкилотлари'),
+        (16,'Литсей ва техникумлар'),
     ]
     targibot_utkazilgan_joy = models.CharField(max_length=255)
     joy_turi                = models.IntegerField(default=1)

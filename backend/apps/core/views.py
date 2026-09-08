@@ -1286,6 +1286,12 @@ def hisobot_excel_xavfsiz_yurt(request):
             COALESCE(SUM(CASE WHEN h.targibot_turi=1 AND j.kategoriya=9
                 AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s THEN 1 END),0) AS boshqa_oy,
 
+            -- Litsey va texnikumlar (kat=16)
+            COALESCE(SUM(CASE WHEN h.targibot_turi=1 AND j.kategoriya=16
+                AND DATE(h.qushilgan_vaqt)=%s THEN 1 END),0) AS litsey_bir_kun,
+            COALESCE(SUM(CASE WHEN h.targibot_turi=1 AND j.kategoriya=16
+                AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s THEN 1 END),0) AS litsey_oy,
+
             /* ── Fuqarolar soni (offline+online jami) ── */
             COALESCE(SUM(CASE WHEN h.targibot_turi IN (1,2)
                 AND DATE(h.qushilgan_vaqt)=%s THEN h.qatnashchilar_soni END),0) AS fuk_bir_kun,
@@ -1366,8 +1372,8 @@ def hisobot_excel_xavfsiz_yurt(request):
     p = []
     # j_bir_kun, j_oy
     p += [s, ob, s]
-    # 8 kategoriya × (bir_kun + oy)
-    for _ in range(8):
+    # 9 kategoriya × (bir_kun + oy)
+    for _ in range(9):
         p += [s, ob, s]
     # fuk
     p += [s, ob, s]
@@ -1432,7 +1438,7 @@ def hisobot_excel_xavfsiz_yurt(request):
         return c
 
     # ── Sarlavha ──
-    ws.merge_cells('A1:BK1')
+    ws.merge_cells('A1:BM1')
     c = ws.cell(1, 1, f"Xavfsiz va Sog'lom Yurt — {sana_str} ({oy_boshi} dan {sana_str} gacha)")
     c.font = fnt(bold=True, color='FFFFFF', size=10)
     c.fill = DARK; c.alignment = ctr
@@ -1441,44 +1447,45 @@ def hisobot_excel_xavfsiz_yurt(request):
     # ── 1-jadval sarlavhalari (qator 2-4) ──
     # Qator 2: katta bo'limlar
     hdr(ws, 2, 1, 'Hududlar', DARK, colspan=1)
-    hdr(ws, 2, 2, "O'tkazilgan uchrashuvlar soni", MID, colspan=18)
-    hdr(ws, 2, 20, "Qatnashchilar soni", GREEN, colspan=10)
-    hdr(ws, 2, 30, "OAV chiqishlari soni", MID, colspan=12)
-    hdr(ws, 2, 42, "Tarqatilgan materiallar", ORANGE, colspan=10)
-    hdr(ws, 2, 52, "Suhbatlar", PURPLE, colspan=2)
+    hdr(ws, 2, 2, "O'tkazilgan uchrashuvlar soni", MID, colspan=20)
+    hdr(ws, 2, 22, "Qatnashchilar soni", GREEN, colspan=10)
+    hdr(ws, 2, 32, "OAV chiqishlari soni", MID, colspan=12)
+    hdr(ws, 2, 44, "Tarqatilgan materiallar", ORANGE, colspan=10)
+    hdr(ws, 2, 54, "Suhbatlar", PURPLE, colspan=2)
 
     # Qator 3: kategoriyalar
     col = 2
     for nom in ['JAMI', 'Mahalla', "Oliy ta'lim", 'Maktablar',
-                'Maktabgacha', 'Kasalxona', 'Bozorlar', 'HMQO', 'Boshqa']:
+                'Maktabgacha', 'Kasalxona', 'Bozorlar', 'HMQO', 'Boshqa',
+                'Litsey va texnikum']:
         hdr(ws, 3, col, nom, LT_BLU if col == 2 else LT_GRN, color='000000', colspan=2)
         col += 2
 
-    col = 20
+    col = 22
     for nom in ['JAMI fuqarolar', '18 yoshgacha (off.)', '18 katta (off.)',
                 '18 yoshgacha (onl.)', '18 katta (onl.)']:
         hdr(ws, 3, col, nom, LT_GRN, color='000000', colspan=2)
         col += 2
 
-    col = 30
+    col = 32
     for nom in ['JAMI OAV', 'Televidenie', 'Radio', 'Gazeta', 'Jurnal', 'Internet']:
         hdr(ws, 3, col, nom, LT_BLU, color='000000', colspan=2)
         col += 2
 
-    col = 42
+    col = 44
     for nom in ['JAMI mat.', 'Video/kontent', 'Banner', 'Flayer', 'Buklet', 'Boshqa']:
         hdr(ws, 3, col, nom, YELLOW, color='000000', colspan=2)
         col += 2
 
-    hdr(ws, 3, 52, 'Suhbatlar', PURPLE, colspan=2)
+    hdr(ws, 3, 54, 'Suhbatlar', PURPLE, colspan=2)
 
     # Qator 4: bir kunda / oy boshidan
     ws.cell(2, 1).font = fnt(bold=True, color='FFFFFF')
     ws.merge_cells(start_row=2, start_column=1, end_row=4, end_column=1)
-    for col in range(2, 54):
+    for col in range(2, 56):
         c_bk = ws.cell(4, col, 'bk' if col % 2 == 0 else 'oy')
         c_bk.font = fnt(italic=True, size=7)
-        c_bk.fill = LT_BLU if col < 30 else (YELLOW if col >= 42 else LT_BLU)
+        c_bk.fill = LT_BLU if col < 32 else (YELLOW if col >= 44 else LT_BLU)
         c_bk.alignment = ctr; c_bk.border = brd
 
     ws.row_dimensions[2].height = 32
@@ -1487,7 +1494,7 @@ def hisobot_excel_xavfsiz_yurt(request):
 
     # ── Ustun kengliklari ──
     ws.column_dimensions['A'].width = 18
-    for col in range(2, 54):
+    for col in range(2, 56):
         ws.column_dimensions[get_column_letter(col)].width = 6
 
     # ── Ma'lumot qatorlari ──
@@ -1503,6 +1510,7 @@ def hisobot_excel_xavfsiz_yurt(request):
             ('maktabgacha_bir_kun','maktabgacha_oy'),('kasalxona_bir_kun','kasalxona_oy'),
             ('bozor_bir_kun','bozor_oy'),('hmqo_bir_kun','hmqo_oy'),
             ('boshqa_bir_kun','boshqa_oy'),
+            ('litsey_bir_kun','litsey_oy'),
             ('fuk_bir_kun','fuk_oy'),
             ('off18g_bir_kun','off18g_oy'),('off18k_bir_kun','off18k_oy'),
             ('onl18g_bir_kun','onl18g_oy'),('onl18k_bir_kun','onl18k_oy'),
@@ -1524,7 +1532,7 @@ def hisobot_excel_xavfsiz_yurt(request):
             c2 = ws.cell(ri, col+1, v2)
             for cc in (c1, c2):
                 cc.font = fnt(); cc.border = brd; cc.alignment = ctr
-                cc.fill = LT_BLU if col < 30 else (YELLOW if col >= 42 else LT_BLU)
+                cc.fill = LT_BLU if col < 32 else (YELLOW if col >= 44 else LT_BLU)
             col += 2
 
         ws.row_dimensions[ri].height = 15
@@ -1620,6 +1628,7 @@ def xavfsiz_yurt_template_excel(request):  # noqa: C901
             COALESCE(SUM(CASE WHEN j.kategoriya=13 THEN 1 END),0) AS k13,
             COALESCE(SUM(CASE WHEN j.kategoriya=14 THEN 1 END),0) AS k14,
             COALESCE(SUM(CASE WHEN j.kategoriya=15 THEN 1 END),0) AS k15,
+            COALESCE(SUM(CASE WHEN j.kategoriya=16 THEN 1 END),0) AS k16,
             COALESCE(SUM(h.qatnashchilar_soni),0)  AS fuk,
             COALESCE(SUM(h.offline_18_gacha),0)    AS o18g,
             COALESCE(SUM(h.offline_18_katta),0)    AS o18k,
@@ -1636,7 +1645,7 @@ def xavfsiz_yurt_template_excel(request):  # noqa: C901
     # ── SQL: oy boshidan (bot) ────────────────────────────────────────────────
     sql_month = """
         SELECT v.id,
-            COALESCE(SUM(CASE WHEN j.kategoriya BETWEEN 1 AND 12 OR j.kategoriya IN (14,15) THEN 1 END),0) AS jami,
+            COALESCE(SUM(CASE WHEN j.kategoriya BETWEEN 1 AND 12 OR j.kategoriya IN (14,15,16) THEN 1 END),0) AS jami,
             COALESCE(SUM(h.qatnashchilar_soni),0) AS fuk
         FROM viloyat v
         LEFT JOIN tuman t   ON t.viloyat_id=v.id
@@ -1708,8 +1717,8 @@ def xavfsiz_yurt_template_excel(request):  # noqa: C901
         def ginf(k): return int(getattr(inf, k, 0) or 0) if inf else 0
 
         talim_soni = ginf('oliy_talim') + ginf('akademik_litsey') + ginf('orta_talim') + ginf('maktabgacha')
-        talim_birk = gi('k2') + gi('k14') + gi('k15')
-        jami_birk  = sum(gi(f'k{i}') for i in range(1,13)) + gi('k14') + gi('k15') + gk('iio_tv_murojaati')
+        talim_birk = gi('k2') + gi('k14') + gi('k15') + gi('k16')
+        jami_birk  = sum(gi(f'k{i}') for i in range(1,13)) + gi('k14') + gi('k15') + gi('k16') + gk('iio_tv_murojaati')
         jami_oy    = gm('jami') + gkm('iio_tv')
 
         def w(col, val):
@@ -1868,6 +1877,7 @@ def kunlik_ishlar_excel(request):  # noqa: C901
             COALESCE(SUM(CASE WHEN j.kategoriya=13 THEN 1 END),0) AS k13,
             COALESCE(SUM(CASE WHEN j.kategoriya=14 THEN 1 END),0) AS k14,
             COALESCE(SUM(CASE WHEN j.kategoriya=15 THEN 1 END),0) AS k15,
+            COALESCE(SUM(CASE WHEN j.kategoriya=16 THEN 1 END),0) AS k16,
             COALESCE(SUM(h.qatnashchilar_soni),0) AS fuk,
             COALESCE(SUM(h.offline_18_gacha),0)   AS o18g,
             COALESCE(SUM(h.offline_18_katta),0)   AS o18k,
@@ -1963,19 +1973,20 @@ def kunlik_ishlar_excel(request):  # noqa: C901
     #  21-22: Масжидлар
     #  23-24: ҲМҚО
     #  25-26: Бошқа (Telegram)
-    #  27-28: ИИО ТВ мурожаати (сони=0, бир кунда)
-    #  29: ЖАМИ учрашувлар (бир кунда)
+    #  27-28: Litsey va texnikumlar
+    #  29-30: ИИО ТВ мурожаати (сони=0, бир кунда)
+    #  31: ЖАМИ учрашувлар (бир кунда)
     # Қатнашчилар:
-    #  30: Жами  31: 18гача(офф)  32: 18катта(офф)  33: 18гача(онл)  34: 18катта(онл)
+    #  32: Жами  33: 18гача(офф)  34: 18катта(офф)  35: 18гача(онл)  36: 18катта(онл)
     # ОАВ:
-    #  35: ТВ  36: Радио  37: Газета  38: Интернет  39: Видео жами  40:10К  41:100К  42:1М
+    #  37: ТВ  38: Радио  39: Газета  40: Интернет  41: Видео жами  42:10К  43:100К  44:1М
     # Материаллар:
-    #  43: Ижт.тармоқ  44: Ўз ташаб.  45: Флаер  46: LED  47: Бошқа
-    # Пробация: 48
-    # Қўшимча: 49:ИИО хизмат  50:Ҳамкор  51:Сайбер
-    # ЖАМИ: 52
+    #  45: Ижт.тармоқ  46: Ўз ташаб.  47: Флаер  48: LED  49: Бошқа
+    # Пробация: 50
+    # Қўшимча: 51:ИИО хизмат  52:Ҳамкор  53:Сайбер
+    # ЖАМИ: 54
 
-    NC = 52
+    NC = 54
 
     # ── Qator 1: Asosiy sarlavha ──────────────────────────────────────────────
     ws.merge_cells(f'A1:{get_column_letter(NC)}1')
@@ -1987,13 +1998,13 @@ def kunlik_ishlar_excel(request):  # noqa: C901
     # ── Qator 2: Guruh sarlavhalari ───────────────────────────────────────────
     h(2, 1, '№',              HDR1, fc='FFFFFF', rows=2)
     h(2, 2, 'Ҳудудлар',       HDR1, fc='FFFFFF', rows=2)
-    h(2, 3, 'Ўтказилган учрашувлар сони', HDR2, fc='000000', span=27)
-    h(2, 30,'Қатнашчилар сони',           QATN, fc='000000', span=5)
-    h(2, 35,'ОАВ чиқишлари сони',         OAV_H, fc='000000', span=8)
-    h(2, 43,'Тарқатилган материаллар',     MAT_H, fc='000000', span=5)
-    h(2, 48,'Пробация',                    PROB,  fc='000000')
-    h(2, 49,"Қўшимча кўрсаткичлар",       YELLOW,fc='000000', span=3)
-    h(2, 52,'ЖАМИ учр.+проб.',             JAMI_F,fc='FFFFFF')
+    h(2, 3, 'Ўтказилган учрашувлар сони', HDR2, fc='000000', span=29)
+    h(2, 32,'Қатнашчилар сони',           QATN, fc='000000', span=5)
+    h(2, 37,'ОАВ чиқишлари сони',         OAV_H, fc='000000', span=8)
+    h(2, 45,'Тарқатилган материаллар',     MAT_H, fc='000000', span=5)
+    h(2, 50,'Пробация',                    PROB,  fc='000000')
+    h(2, 51,"Қўшимча кўрсаткичлар",       YELLOW,fc='000000', span=3)
+    h(2, 54,'ЖАМИ учр.+проб.',             JAMI_F,fc='FFFFFF')
     ws.row_dimensions[2].height = 30
 
     # ── Qator 3: Kategoriya sarlavhalari ──────────────────────────────────────
@@ -2003,48 +2014,48 @@ def kunlik_ishlar_excel(request):  # noqa: C901
         'Мактаблар',        "Мактабгача\nтаълим",
         'Касалхона',        'Бозорлар',        'Истироҳат\nбоғлари',
         'Жамоат\nтранспорти','Масжидлар',       'ҲМҚО',
-        'Бошқа\n(Telegram)',
+        'Бошқа\n(Telegram)', "Литсей ва\nтехникумлар",
     ]
     for i, nom in enumerate(uch_cats):
         col = 3 + i * 2
         h(3, col, nom, HDR2, fc='000000', span=2, sz=8)
 
-    h(3, 27, 'ИИО ТВ\nмурожаати',  GREEN, fc='FF0000', span=2, sz=8)
-    h(3, 29, 'ЖАМИ\nучрашувлар',   YELLOW, fc='000000', sz=8)
+    h(3, 29, 'ИИО ТВ\nмурожаати',  GREEN, fc='FF0000', span=2, sz=8)
+    h(3, 31, 'ЖАМИ\nучрашувлар',   YELLOW, fc='000000', sz=8)
 
     # Qatnashchilar
     for i, nom in enumerate(['ЖАМИ\nфуқаролар','18 ёшгача\n(офф.)','18 катта\n(офф.)','18 ёшгача\n(онл.)','18 катта\n(онл.)']):
-        h(3, 30+i, nom, QATN, fc='000000', sz=8)
+        h(3, 32+i, nom, QATN, fc='000000', sz=8)
 
     # OAV
     for i, nom in enumerate(['Теле-\nвидение','Радио','Газета+\nЖурнал','Интернет','Видео\nжами','10К+','100К+','1М+']):
-        h(3, 35+i, nom, OAV_H, fc='000000', sz=8)
+        h(3, 37+i, nom, OAV_H, fc='000000', sz=8)
 
     # Materiallar
     for i, nom in enumerate(['Ижт.\nтармоқ','Ўз\nташаббуси','Флаер+\nбукл.','LED\nэкран','Бошқа\nмат.']):
-        h(3, 43+i, nom, MAT_H, fc='000000', sz=8)
+        h(3, 45+i, nom, MAT_H, fc='000000', sz=8)
 
-    h(3, 48, 'Пробация\nсони',    PROB,  fc='000000', sz=8)
-    h(3, 49, 'ИИО\nхизмат',       YELLOW,fc='000000', sz=8)
-    h(3, 50, 'Ҳамкор\nташкилот',  YELLOW,fc='000000', sz=8)
-    h(3, 51, 'Сайбер\nжиноят',    YELLOW,fc='000000', sz=8)
-    h(3, 52, 'ЖАМИ\nучр.+проб.',  JAMI_F,fc='FFFFFF', sz=8)
+    h(3, 50, 'Пробация\nсони',    PROB,  fc='000000', sz=8)
+    h(3, 51, 'ИИО\nхизмат',       YELLOW,fc='000000', sz=8)
+    h(3, 52, 'Ҳамкор\nташкилот',  YELLOW,fc='000000', sz=8)
+    h(3, 53, 'Сайбер\nжиноят',    YELLOW,fc='000000', sz=8)
+    h(3, 54, 'ЖАМИ\nучр.+проб.',  JAMI_F,fc='FFFFFF', sz=8)
     ws.row_dimensions[3].height = 42
 
     # ── Qator 4: сони / бир кунда subheader ──────────────────────────────────
     h(4, 1, '',   GRAY)
     h(4, 2, '',   GRAY)
-    for i in range(12):
+    for i in range(13):
         col = 3 + i * 2
         h(4, col,   'сони',     SONI, bold=False, fc='000000', sz=8)
         h(4, col+1, 'бир кунда', BIRK, bold=False, fc='000000', sz=8)
-    h(4, 27, 'ой\nбошидан', GREEN,  bold=True, fc='C00000', sz=8)
-    h(4, 28, 'бир кунда',   BIRK,   bold=True, fc='C00000', sz=8)
-    h(4, 29, 'бир кунда',   YELLOW, bold=True, fc='C00000', sz=8)
-    for col in range(30, NC+1):
-        fill = QATN if col<=34 else (OAV_H if col<=42 else (MAT_H if col<=47 else (PROB if col==48 else (YELLOW if col<=51 else JAMI_F))))
-        fc   = '000000' if col < 52 else 'FFFFFF'
-        h(4, col, 'бир кунда' if col!=52 else '', fill, bold=False, fc=fc, sz=8)
+    h(4, 29, 'ой\nбошидан', GREEN,  bold=True, fc='C00000', sz=8)
+    h(4, 30, 'бир кунда',   BIRK,   bold=True, fc='C00000', sz=8)
+    h(4, 31, 'бир кунда',   YELLOW, bold=True, fc='C00000', sz=8)
+    for col in range(32, NC+1):
+        fill = QATN if col<=36 else (OAV_H if col<=44 else (MAT_H if col<=49 else (PROB if col==50 else (YELLOW if col<=53 else JAMI_F))))
+        fc   = '000000' if col < 54 else 'FFFFFF'
+        h(4, col, 'бир кунда' if col!=54 else '', fill, bold=False, fc=fc, sz=8)
     ws.row_dimensions[4].height = 28
 
     # ── Ustun kengliklari ─────────────────────────────────────────────────────
@@ -2066,11 +2077,12 @@ def kunlik_ishlar_excel(request):  # noqa: C901
         mfy = mfy_cnt.get(v.id, 0)
 
         oliy_soni        = ginf(inf,'oliy_talim')
-        maktab_soni      = ginf(inf,'akademik_litsey') + ginf(inf,'orta_talim')
+        litsey_soni      = ginf(inf,'akademik_litsey')
+        maktab_soni      = ginf(inf,'orta_talim')
         maktabgacha_soni = ginf(inf,'maktabgacha')
-        jami_birk  = sum(iv(b,f'k{i}') for i in range(1,13)) + iv(b,'k14') + iv(b,'k15')
+        jami_birk  = sum(iv(b,f'k{i}') for i in range(1,13)) + iv(b,'k14') + iv(b,'k15') + iv(b,'k16')
 
-        # сони | бир кунда — 12 kategoriya × 2 col
+        # сони | бир кунда — 13 kategoriya × 2 col
         pairs = [
             (mfy,                      iv(b,'k1')),   # Mahalla
             (ginf(inf,'qizil_mfy'),    iv(b,'k1')),   # Qizil MFY
@@ -2084,6 +2096,7 @@ def kunlik_ishlar_excel(request):  # noqa: C901
             (ginf(inf,'masjid'),       iv(b,'k12')),  # Masjid
             (ginf(inf,'xmko'),         iv(b,'k8')),   # XMKO
             (ginf(inf,'telegram'),     iv(b,'k9')),   # Boshqa/Telegram
+            (litsey_soni,              iv(b,'k16')),  # Litsey va texnikum
         ]
 
         row_vals = {}
@@ -2092,25 +2105,25 @@ def kunlik_ishlar_excel(request):  # noqa: C901
             row_vals[3 + i*2+1] = birk
 
         iiotv_bk = iv(kd,'iiotv')
-        row_vals[27] = 0          # IIO TV "oy boshidan" — bizda yo'q
-        row_vals[28] = iiotv_bk   # IIO TV bir kunda
-        row_vals[29] = jami_birk  # JAMI uchrashuvlar
+        row_vals[29] = 0          # IIO TV "oy boshidan" — bizda yo'q
+        row_vals[30] = iiotv_bk   # IIO TV bir kunda
+        row_vals[31] = jami_birk  # JAMI uchrashuvlar
 
-        row_vals[30] = iv(b,'fuk')
-        row_vals[31] = iv(b,'o18g'); row_vals[32] = iv(b,'o18k')
-        row_vals[33] = iv(b,'n18g'); row_vals[34] = iv(b,'n18k')
+        row_vals[32] = iv(b,'fuk')
+        row_vals[33] = iv(b,'o18g'); row_vals[34] = iv(b,'o18k')
+        row_vals[35] = iv(b,'n18g'); row_vals[36] = iv(b,'n18k')
 
-        row_vals[35] = iv(kd,'tv');    row_vals[36] = iv(kd,'radio')
-        row_vals[37] = iv(kd,'gazeta'); row_vals[38] = iv(kd,'internet')
-        row_vals[39] = iv(kd,'video')
-        row_vals[40] = iv(kd,'v10k');  row_vals[41] = iv(kd,'v100k'); row_vals[42] = iv(kd,'v1m')
+        row_vals[37] = iv(kd,'tv');    row_vals[38] = iv(kd,'radio')
+        row_vals[39] = iv(kd,'gazeta'); row_vals[40] = iv(kd,'internet')
+        row_vals[41] = iv(kd,'video')
+        row_vals[42] = iv(kd,'v10k');  row_vals[43] = iv(kd,'v100k'); row_vals[44] = iv(kd,'v1m')
 
-        row_vals[43] = iv(kd,'ijt');  row_vals[44] = iv(kd,'ozt')
-        row_vals[45] = iv(kd,'flay'); row_vals[46] = iv(kd,'led'); row_vals[47] = iv(kd,'matb')
+        row_vals[45] = iv(kd,'ijt');  row_vals[46] = iv(kd,'ozt')
+        row_vals[47] = iv(kd,'flay'); row_vals[48] = iv(kd,'led'); row_vals[49] = iv(kd,'matb')
 
-        row_vals[48] = iv(b,'k13')
-        row_vals[49] = iv(kd,'iiox'); row_vals[50] = iv(kd,'hmkr'); row_vals[51] = iv(kd,'sayb')
-        row_vals[52] = jami_birk + iv(b,'k13')
+        row_vals[50] = iv(b,'k13')
+        row_vals[51] = iv(kd,'iiox'); row_vals[52] = iv(kd,'hmkr'); row_vals[53] = iv(kd,'sayb')
+        row_vals[54] = jami_birk + iv(b,'k13')
 
         # Raqam va hudud
         cc = ws.cell(ri, 1, ri-4)
@@ -2122,17 +2135,17 @@ def kunlik_ishlar_excel(request):  # noqa: C901
         # Har ustun
         for col, val in row_vals.items():
             # "сони" ustunlari: 3,5,7,9,11,13,15,17,19,21 (toq)
-            is_soni = (3 <= col <= 26) and (col % 2 == 1)
-            is_birk = (3 <= col <= 26) and (col % 2 == 0)
-            if col == 27: fill = GREEN
-            elif col == 28: fill = BIRK
-            elif col == 29: fill = YELLOW
-            elif col <= 34: fill = QATN
-            elif col <= 42: fill = OAV_D
-            elif col <= 47: fill = MAT_D
-            elif col == 48: fill = PROB
-            elif col <= 51: fill = PatternFill('solid', fgColor='FFFFCC')
-            elif col == 52: fill = YELLOW
+            is_soni = (3 <= col <= 28) and (col % 2 == 1)
+            is_birk = (3 <= col <= 28) and (col % 2 == 0)
+            if col == 29: fill = GREEN
+            elif col == 30: fill = BIRK
+            elif col == 31: fill = YELLOW
+            elif col <= 36: fill = QATN
+            elif col <= 44: fill = OAV_D
+            elif col <= 49: fill = MAT_D
+            elif col == 50: fill = PROB
+            elif col <= 53: fill = PatternFill('solid', fgColor='FFFFCC')
+            elif col == 54: fill = YELLOW
             elif is_soni: fill = SONI
             else: fill = BIRK
 
@@ -3444,7 +3457,7 @@ def _bot_agg(viloyat_id, sana_str, end_str=None):
         )
 
     # kategoriya bo'yicha hisobotlar soni (bir kunda)
-    kat_raqamlar = list(range(1, 12)) + [14, 15]
+    kat_raqamlar = list(range(1, 12)) + [14, 15, 16]
     kat_ids = {k: list(TargibotUtkazilganJoy.objects.filter(kategoriya=k).values_list('id', flat=True))
                for k in kat_raqamlar}
 
@@ -3473,6 +3486,7 @@ def _bot_agg(viloyat_id, sana_str, end_str=None):
         'kat11'    : c(11),  # Probatsiya ro'yxatidagi shaxslar
         'kat14'    : c(14),  # Maktablar
         'kat15'    : c(15),  # Maktabgacha ta'lim tashkilotlari
+        'kat16'    : c(16),  # Litsey va texnikumlar
         'jami'     : qs.count(),
         'fuk_jami' : int(agg['fuk_jami'] or 0),
         'off18g'  : int(agg['off18g'] or 0),
