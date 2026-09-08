@@ -17,12 +17,11 @@ from docx.shared import Pt
 from django.http import FileResponse, HttpResponse
 from django.conf import settings
 
-from .models import Viloyat, Tuman, Mahalla, Hisobot, Rasm, TargibotUtkazilganJoy, AuditLog, Inspektor, MurojaatUsul, MurojaatKasb, Murojaat, KunlikIshlar, HamkorTashkilot, HamkorXodim, ViloyatInfratuzilma
+from .models import Viloyat, Tuman, Mahalla, Hisobot, Rasm, TargibotUtkazilganJoy, AuditLog, Inspektor, MurojaatUsul, MurojaatKasb, Murojaat, KunlikIshlar, HamkorTashkilot, HamkorXodim, ViloyatInfratuzilma, ViloyatJoySoni
 from .serializers import (ViloyatSerializer, TumanSerializer, MahallaSerializer,
                           HisobotSerializer, TargibotJoySerializer, InspektorSerializer,
                           MurojaatUsulSerializer, MurojaatKasbSerializer, MurojaatSerializer,
-                          KunlikIshlarSerializer, HamkorTashkilotSerializer, HamkorXodimSerializer,
-                          ViloyatInfratuzilmaSerializer)
+                          KunlikIshlarSerializer, HamkorTashkilotSerializer, HamkorXodimSerializer)
 from .permissions import IsRespublika, IsViloyatOrAbove
 from apps.accounts.models import User
 from apps.accounts.serializers import FoydalanuvchiSerializer
@@ -1680,7 +1679,9 @@ def xavfsiz_yurt_template_excel(request):  # noqa: C901
             iio_tv=DSum('iio_tv_murojaati'),
         )}
 
-    infra = {i.viloyat_id: i for i in ViloyatInfratuzilma.objects.all()}
+    infra = {}
+    for r in ViloyatJoySoni.objects.values('viloyat_id', 'kategoriya', 'soni'):
+        infra.setdefault(r['viloyat_id'], {})[r['kategoriya']] = r['soni']
 
     with connection.cursor() as cur:
         cur.execute("SELECT v.id, COUNT(m.id) FROM viloyat v LEFT JOIN tuman t ON t.viloyat_id=v.id LEFT JOIN mahalla m ON m.tuman_id=t.id GROUP BY v.id")
@@ -1714,9 +1715,9 @@ def xavfsiz_yurt_template_excel(request):  # noqa: C901
         def gm(k):   return g(bm, k)
         def gk(k):   return g(kd, k)
         def gkm(k):  return g(km, k)
-        def ginf(k): return int(getattr(inf, k, 0) or 0) if inf else 0
+        def ginf(kat): return int(inf.get(kat, 0)) if inf else 0
 
-        talim_soni = ginf('oliy_talim') + ginf('akademik_litsey') + ginf('orta_talim') + ginf('maktabgacha')
+        talim_soni = ginf(2) + ginf(16) + ginf(14) + ginf(15)
         talim_birk = gi('k2') + gi('k14') + gi('k15') + gi('k16')
         jami_birk  = sum(gi(f'k{i}') for i in range(1,13)) + gi('k14') + gi('k15') + gi('k16') + gk('iio_tv_murojaati')
         jami_oy    = gm('jami') + gkm('iio_tv')
@@ -1734,7 +1735,7 @@ def xavfsiz_yurt_template_excel(request):  # noqa: C901
         w(7, gi('k1'))
 
         # Қизил МФЙлар: сони=8, бир кунда=9
-        w(8, ginf('qizil_mfy'))
+        w(8, ginf(1))
         w(9, gi('k1'))   # mahalla tashrifi = kat1
 
         # Таълим: сони=10, бир кунда=11
@@ -1742,31 +1743,31 @@ def xavfsiz_yurt_template_excel(request):  # noqa: C901
         w(11, talim_birk)
 
         # Касалхона: сони=12, бир кунда=13
-        w(12, ginf('kasalxona'))
-        w(13, gi('k6'))
+        w(12, ginf(3))
+        w(13, gi('k3'))
 
         # Бозорлар: сони=14, бир кунда=15
-        w(14, ginf('bozor'))
-        w(15, gi('k7'))
+        w(14, ginf(4))
+        w(15, gi('k4'))
 
         # Истироҳат: сони=16, бир кунда=17
-        w(16, ginf('istirohat'))
-        w(17, gi('k10'))
+        w(16, ginf(5))
+        w(17, gi('k5'))
 
         # Жамоат транспорти: сони=18, бир кунда=19
-        w(18, ginf('jamoat_transport'))
-        w(19, gi('k11'))
+        w(18, ginf(6))
+        w(19, gi('k6'))
 
         # Масжидлар: сони=20, бир кунда=21
-        w(20, ginf('masjid'))
-        w(21, gi('k12'))
+        w(20, ginf(7))
+        w(21, gi('k7'))
 
         # ҲМҚО: сони=22, бир кунда=23
-        w(22, ginf('xmko'))
+        w(22, ginf(8))
         w(23, gi('k8'))
 
         # Бошқа (Telegram): сони=24, бир кунда=25
-        w(24, ginf('telegram'))
+        w(24, ginf(9))
         w(25, gi('k9'))
 
         # ИИО ТВ: ой бошидан=26, бир кунда=27
@@ -1912,7 +1913,9 @@ def kunlik_ishlar_excel(request):  # noqa: C901
         ))
     ki = {r['viloyat_id']: {k: int(v or 0) for k,v in r.items() if k!='viloyat_id'} for r in ki_agg}
 
-    infra = {i.viloyat_id: i for i in ViloyatInfratuzilma.objects.all()}
+    infra = {}
+    for r in ViloyatJoySoni.objects.values('viloyat_id', 'kategoriya', 'soni'):
+        infra.setdefault(r['viloyat_id'], {})[r['kategoriya']] = r['soni']
     with connection.cursor() as cur:
         cur.execute("SELECT v.id, COUNT(m.id) FROM viloyat v LEFT JOIN tuman t ON t.viloyat_id=v.id LEFT JOIN mahalla m ON m.tuman_id=t.id GROUP BY v.id")
         mfy_cnt = {r[0]: r[1] for r in cur.fetchall()}
@@ -2066,7 +2069,7 @@ def kunlik_ishlar_excel(request):  # noqa: C901
 
     # ── Ma'lumot qatorlari ────────────────────────────────────────────────────
     def iv(d, key): return int(d.get(key) or 0) if d else 0
-    def ginf(inf, k): return int(getattr(inf, k, 0) or 0) if inf else 0
+    def ginf(inf, kategoriya): return int(inf.get(kategoriya, 0)) if inf else 0
 
     jami = {c: 0 for c in range(3, NC+1)}
 
@@ -2076,26 +2079,26 @@ def kunlik_ishlar_excel(request):  # noqa: C901
         inf = infra.get(v.id)
         mfy = mfy_cnt.get(v.id, 0)
 
-        oliy_soni        = ginf(inf,'oliy_talim')
-        litsey_soni      = ginf(inf,'akademik_litsey')
-        maktab_soni      = ginf(inf,'orta_talim')
-        maktabgacha_soni = ginf(inf,'maktabgacha')
+        oliy_soni        = ginf(inf,2)
+        litsey_soni      = ginf(inf,16)
+        maktab_soni      = ginf(inf,14)
+        maktabgacha_soni = ginf(inf,15)
         jami_birk  = sum(iv(b,f'k{i}') for i in range(1,13)) + iv(b,'k14') + iv(b,'k15') + iv(b,'k16')
 
         # сони | бир кунда — 13 kategoriya × 2 col
         pairs = [
             (mfy,                      iv(b,'k1')),   # Mahalla
-            (ginf(inf,'qizil_mfy'),    iv(b,'k1')),   # Qizil MFY
+            (ginf(inf,1),              iv(b,'k1')),   # Qizil MFY
             (oliy_soni,                iv(b,'k2')),   # Oliy ta'lim
             (maktab_soni,              iv(b,'k14')),  # Maktablar
             (maktabgacha_soni,         iv(b,'k15')),  # Maktabgacha ta'lim
-            (ginf(inf,'kasalxona'),    iv(b,'k6')),   # Kasalxona
-            (ginf(inf,'bozor'),        iv(b,'k7')),   # Bozor
-            (ginf(inf,'istirohat'),    iv(b,'k10')),  # Istirohat
-            (ginf(inf,'jamoat_transport'), iv(b,'k11')),  # Transport
-            (ginf(inf,'masjid'),       iv(b,'k12')),  # Masjid
-            (ginf(inf,'xmko'),         iv(b,'k8')),   # XMKO
-            (ginf(inf,'telegram'),     iv(b,'k9')),   # Boshqa/Telegram
+            (ginf(inf,3),              iv(b,'k3')),   # Kasalxona
+            (ginf(inf,4),              iv(b,'k4')),   # Bozor
+            (ginf(inf,5),              iv(b,'k5')),   # Istirohat
+            (ginf(inf,6),              iv(b,'k6')),   # Transport
+            (ginf(inf,7),              iv(b,'k7')),   # Masjid
+            (ginf(inf,8),              iv(b,'k8')),   # XMKO
+            (ginf(inf,9),              iv(b,'k9')),   # Boshqa/Telegram
             (litsey_soni,              iv(b,'k16')),  # Litsey va texnikum
         ]
 
@@ -3681,7 +3684,13 @@ def kunlik_ishlar_oraliq(request):
 @api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])
 def infratuzilma(request):
-    """GET/PUT /api/infratuzilma/ — viloyat targ'ibot joylar soni."""
+    """
+    GET/PUT /api/infratuzilma/ — viloyat targ'ibot joylar soni (kategoriya bo'yicha).
+    Kategoriyalar ro'yxati TargibotUtkazilganJoy.KATEGORIYA'dan dinamik olinadi,
+    shuning uchun yangi kategoriya qo'shilganda bu joyga o'zgartirish shart emas.
+    """
+    kat_nomlar = {f'kat{k}': v for k, v in TargibotUtkazilganJoy.KATEGORIYA}
+
     role = request.user.role
     if role == 'viloyat':
         viloyat_id = request.user.viloyat_id
@@ -3689,19 +3698,32 @@ def infratuzilma(request):
         viloyat_id = request.GET.get('viloyat') or request.data.get('viloyat')
         if not viloyat_id:
             # Respublika: barcha viloyatlar uchun ro'yxat
-            qs = ViloyatInfratuzilma.objects.select_related('viloyat').all()
-            return Response(ViloyatInfratuzilmaSerializer(qs, many=True).data)
+            natija = []
+            for v in Viloyat.objects.all().order_by('nomi'):
+                soni = {f"kat{r['kategoriya']}": r['soni']
+                        for r in ViloyatJoySoni.objects.filter(viloyat_id=v.id).values('kategoriya', 'soni')}
+                natija.append({'viloyat': v.id, 'viloyat_nomi': v.nomi, 'soni': soni, 'kat_nomlar': kat_nomlar})
+            return Response(natija)
     else:
         return Response({'error': 'Ruxsat yo\'q'}, status=403)
 
-    obj, _ = ViloyatInfratuzilma.objects.get_or_create(viloyat_id=viloyat_id)
-    if request.method == 'GET':
-        return Response(ViloyatInfratuzilmaSerializer(obj).data)
+    soni = {f"kat{r['kategoriya']}": r['soni']
+            for r in ViloyatJoySoni.objects.filter(viloyat_id=viloyat_id).values('kategoriya', 'soni')}
 
-    ser = ViloyatInfratuzilmaSerializer(obj, data=request.data, partial=True)
-    ser.is_valid(raise_exception=True)
-    ser.save()
-    return Response(ser.data)
+    if request.method == 'GET':
+        return Response({'viloyat': viloyat_id, 'kat_nomlar': kat_nomlar, 'soni': soni})
+
+    yangi_soni = request.data.get('soni') or {}
+    for key, val in yangi_soni.items():
+        if not key.startswith('kat'):
+            continue
+        kategoriya = int(key[3:])
+        obj, _ = ViloyatJoySoni.objects.get_or_create(viloyat_id=viloyat_id, kategoriya=kategoriya)
+        obj.soni = int(val or 0)
+        obj.save(update_fields=['soni', 'yangilangan'])
+        soni[key] = obj.soni
+
+    return Response({'viloyat': viloyat_id, 'kat_nomlar': kat_nomlar, 'soni': soni})
 
 
 @api_view(['POST'])

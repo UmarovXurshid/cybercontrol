@@ -347,3 +347,26 @@ class ViloyatInfratuzilma(models.Model):
 
     def __str__(self):
         return f"{self.viloyat} infratuzilma"
+
+
+# ── ViloyatJoySoni ──────────────────────────────────────────────────────────
+class ViloyatJoySoni(models.Model):
+    """
+    Viloyatdagi targ'ibot joylarining umumiy soni — kategoriya bo'yicha (bir marta kiritiladi).
+    TargibotUtkazilganJoy.KATEGORIYA ro'yxatiga bog'langan, shuning uchun yangi
+    kategoriya qo'shilganda bu jadvalga o'zgartirish kiritish shart emas.
+    ViloyatInfratuzilma o'rnini bosadi (u hozircha zaxira sifatida saqlanadi).
+    """
+    viloyat     = models.ForeignKey(Viloyat, on_delete=models.CASCADE,
+                                    db_column='viloyat_id',
+                                    related_name='joy_sonlari')
+    kategoriya  = models.IntegerField(choices=TargibotUtkazilganJoy.KATEGORIYA)
+    soni        = models.IntegerField(default=0)
+    yangilangan = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'viloyat_joy_soni'
+        unique_together = ('viloyat', 'kategoriya')
+
+    def __str__(self):
+        return f"{self.viloyat} - kat{self.kategoriya}: {self.soni}"

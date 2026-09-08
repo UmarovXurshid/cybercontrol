@@ -285,54 +285,39 @@ function RespublikaListView({ sana, onSelect }) {
 /* ══════════════════════════════════════════════════════════════════════════════
    INFRATUZILMA PANELI — viloyat targ'ibot joylar umumiy soni
 ═══════════════════════════════════════════════════════════════════════════════ */
-const INFRA_FIELDS = [
-  { field: 'qizil_mfy',        label: "Qizil MFYlar soni" },
-  { field: 'oliy_talim',       label: "Oliy ta'lim muassasalari" },
-  { field: 'akademik_litsey',  label: "Litsey va texnikumlar" },
-  { field: 'orta_talim',       label: "Maktablar" },
-  { field: 'maktabgacha',      label: "Maktabgacha ta'lim muassasalari" },
-  { field: 'kasalxona',        label: "Kasalxona va poliklinikalar" },
-  { field: 'bozor',            label: "Bozorlar va yirik savdo majmualari" },
-  { field: 'xmko',             label: "XMKOlar" },
-  { field: 'telegram',         label: "Telegram kanallar" },
-  { field: 'istirohat',        label: "Istirohat bog'lari" },
-  { field: 'jamoat_transport', label: "Jamoat transporti" },
-  { field: 'masjid',           label: "Masjidar" },
-  { field: 'probatsiya',       label: "Probatsiya hisobida turuvchilar soni" },
-]
-
-const INFRA_EMPTY = Object.fromEntries(INFRA_FIELDS.map(f => [f.field, 0]))
-
 function InfratuzilmaPanel({ viloyatId }) {
-  const [data, setData]       = useState(INFRA_EMPTY)
+  const [katNomlar, setKatNomlar] = useState({})
+  const [data, setData]       = useState({})
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft]     = useState(INFRA_EMPTY)
+  const [draft, setDraft]     = useState({})
   const [loading, setLoading] = useState(false)
   const [open, setOpen]       = useState(false)
 
   useEffect(() => {
     const params = viloyatId ? `?viloyat=${viloyatId}` : ''
     api.get(`/infratuzilma/${params}`).then(r => {
-      setData(r.data)
-      setDraft(r.data)
+      setKatNomlar(r.data.kat_nomlar || {})
+      setData(r.data.soni || {})
+      setDraft(r.data.soni || {})
     }).catch(() => {})
   }, [viloyatId])
 
   const save = async () => {
     setLoading(true)
     try {
-      const payload = { ...draft }
+      const payload = { soni: draft }
       if (viloyatId) payload.viloyat = viloyatId
       const r = await api.put(`/infratuzilma/`, payload)
-      setData(r.data)
-      setDraft(r.data)
+      setKatNomlar(r.data.kat_nomlar || {})
+      setData(r.data.soni || {})
+      setDraft(r.data.soni || {})
       setEditing(false)
       toast.success("Infratuzilma saqlandi!")
     } catch { toast.error("Xato!") }
     finally { setLoading(false) }
   }
 
-  const setF = (field, val) => setDraft(d => ({ ...d, [field]: val }))
+  const setF = (key, val) => setDraft(d => ({ ...d, [key]: val }))
 
   return (
     <div className="mb-6 border border-teal-200 rounded-xl overflow-hidden">
@@ -344,14 +329,14 @@ function InfratuzilmaPanel({ viloyatId }) {
       {open && (
         <div className="bg-white">
           <div className="divide-y divide-gray-100">
-            {INFRA_FIELDS.map(({ field, label }) => (
-              <div key={field} className="flex items-center justify-between py-1.5 px-3">
+            {Object.entries(katNomlar).map(([key, label]) => (
+              <div key={key} className="flex items-center justify-between py-1.5 px-3">
                 <span className="text-sm text-gray-700">{label}</span>
                 {editing
-                  ? <input type="number" min={0} value={draft[field] || 0}
-                      onChange={e => setF(field, Number(e.target.value))}
+                  ? <input type="number" min={0} value={draft[key] || 0}
+                      onChange={e => setF(key, Number(e.target.value))}
                       className="w-24 border border-teal-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-1 focus:ring-teal-400" />
-                  : <span className="text-sm font-bold text-teal-800 w-24 text-right pr-2">{data[field] || 0}</span>
+                  : <span className="text-sm font-bold text-teal-800 w-24 text-right pr-2">{data[key] || 0}</span>
                 }
               </div>
             ))}
