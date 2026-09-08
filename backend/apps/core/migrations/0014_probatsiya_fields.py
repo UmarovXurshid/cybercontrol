@@ -3,6 +3,28 @@
 from django.db import migrations, models
 
 
+# Bu ikki ustun ba'zi serverlarda oldindan qo'lda (Django migratsiyasiz)
+# qo'shilgan bo'lishi mumkin. Shuning uchun haqiqiy DB ustunini faqat
+# mavjud bo'lmasa qo'shamiz — "Duplicate column name" xatosining oldini olish uchun.
+def add_missing_columns(apps, schema_editor):
+    connection = schema_editor.connection
+    with connection.cursor() as cursor:
+        ki_cols = {c.name for c in connection.introspection.get_table_description(cursor, 'kunlik_ishlar')}
+        vi_cols = {c.name for c in connection.introspection.get_table_description(cursor, 'viloyat_infratuzilma')}
+
+    KunlikIshlar = apps.get_model('core', 'KunlikIshlar')
+    ViloyatInfratuzilma = apps.get_model('core', 'ViloyatInfratuzilma')
+
+    if 'probatsiya_soni' not in ki_cols:
+        schema_editor.add_field(KunlikIshlar, KunlikIshlar._meta.get_field('probatsiya_soni'))
+    if 'probatsiya' not in vi_cols:
+        schema_editor.add_field(ViloyatInfratuzilma, ViloyatInfratuzilma._meta.get_field('probatsiya'))
+
+
+def noop(apps, schema_editor):
+    pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,14 +32,21 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='kunlikishlar',
-            name='probatsiya_soni',
-            field=models.IntegerField(default=0),
-        ),
-        migrations.AddField(
-            model_name='viloyatinfratuzilma',
-            name='probatsiya',
-            field=models.IntegerField(default=0),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField(
+                    model_name='kunlikishlar',
+                    name='probatsiya_soni',
+                    field=models.IntegerField(default=0),
+                ),
+                migrations.AddField(
+                    model_name='viloyatinfratuzilma',
+                    name='probatsiya',
+                    field=models.IntegerField(default=0),
+                ),
+            ],
+            database_operations=[
+                migrations.RunPython(add_missing_columns, noop),
+            ],
         ),
     ]
