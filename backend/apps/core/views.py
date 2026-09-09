@@ -133,7 +133,7 @@ def respublika_dashboard(request):
         result.append({
             'id':                v.id,
             'nomi':              v.nomi,
-            'mahalla_soni':      Mahalla.objects.filter(tuman__viloyat_id=v.id, is_tuman=False).count(),
+            'mahalla_soni':      Mahalla.objects.filter(tuman__viloyat_id=v.id, is_tuman=False, is_viloyat=False).count(),
             'yangi':             qs.filter(status=1).count(),
             'tasdiqlangan':      qs.filter(status=2).count(),
             'rad_etilgan':       qs.filter(status=3).count(),
@@ -564,7 +564,7 @@ def hisobot_tumanlar(request):
     extra_where, extra_params = get_viloyat_sql(request)
     sql = f"""
         SELECT tuman.tuman_nomi,
-               (SELECT COUNT(*) FROM mahalla m WHERE m.tuman_id=tuman.id AND m.is_tuman=0) AS mahalla_soni,
+               (SELECT COUNT(*) FROM mahalla m WHERE m.tuman_id=tuman.id AND m.is_tuman=0 AND m.is_viloyat=0) AS mahalla_soni,
                (SELECT COUNT(*) FROM murojaat mr JOIN mahalla m2 ON mr.mahalla_id=m2.id
                 WHERE m2.tuman_id=tuman.id AND mr.sana BETWEEN %s AND %s AND mr.holat != 'takroriy') AS murojaat_soni,
                COALESCE(SUM(h.targibot_turi=1), 0)  AS offline_targibot_soni,
@@ -628,8 +628,9 @@ def hisobot_viloyatlar(request):
     end   = request.GET.get('end',   date.today().isoformat())
     sql = """
         SELECT v.id, v.nomi,
-               COUNT(DISTINCT t.id)  AS tuman_soni,
-               (SELECT COUNT(*) FROM mahalla m2 JOIN tuman t2 ON m2.tuman_id=t2.id WHERE t2.viloyat_id=v.id AND m2.is_tuman=0) AS mahalla_soni,
+               (SELECT COUNT(*) FROM tuman t2 WHERE t2.viloyat_id=v.id
+                  AND NOT EXISTS (SELECT 1 FROM mahalla m3 WHERE m3.tuman_id=t2.id AND m3.is_viloyat=1)) AS tuman_soni,
+               (SELECT COUNT(*) FROM mahalla m2 JOIN tuman t2 ON m2.tuman_id=t2.id WHERE t2.viloyat_id=v.id AND m2.is_tuman=0 AND m2.is_viloyat=0) AS mahalla_soni,
                COALESCE(SUM(h.targibot_turi=1), 0) AS offline_targibot_soni,
                COALESCE(SUM(CASE WHEN h.targibot_turi=1 THEN h.qatnashchilar_soni ELSE 0 END),0) AS offline_qatnashchilar,
                COALESCE(SUM(h.targibot_turi=2), 0) AS online_targibot_soni,
@@ -806,7 +807,7 @@ def qamrov(request):
             COUNT(h.id)       AS targibot_soni
         FROM viloyat
         JOIN tuman   ON tuman.viloyat_id  = viloyat.id
-        JOIN mahalla ON mahalla.tuman_id  = tuman.id AND mahalla.is_tuman = 0
+        JOIN mahalla ON mahalla.tuman_id  = tuman.id AND mahalla.is_tuman = 0 AND mahalla.is_viloyat = 0
         LEFT JOIN hisobot h
                ON h.mahalla_id = mahalla.id
               AND h.status = 2
