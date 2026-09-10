@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo } from 'react'
 import api from '../api'
 import toast from 'react-hot-toast'
+import { localDateStr, monthStartStr } from '../utils/date'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, ResponsiveContainer
 } from 'recharts'
 
-const today = new Date().toISOString().slice(0, 10)
-const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-  .toISOString().slice(0, 10)
+const today = localDateStr()
+const firstOfMonth = monthStartStr()
 
 const COLORS = ['#1e3a5f','#2e6da4','#3c8dbc','#4caf50','#ff9800','#e53935',
                 '#8e24aa','#00897b','#f06292','#fdd835','#546e7a','#26a69a',

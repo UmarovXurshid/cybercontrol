@@ -1,10 +1,11 @@
 ﻿import { useEffect, useState, useRef } from 'react'
 import api from '../api'
 import toast from 'react-hot-toast'
+import { localDateStr, daysAgoStr } from '../utils/date'
 
 // Default: oxirgi 30 kun (joriy oy boshi emas — ma'lumotlar avvalgi oyda bo'lishi mumkin)
-const today      = new Date().toISOString().slice(0, 10)
-const monthStart = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0, 10)
+const today      = localDateStr()
+const monthStart = daysAgoStr(30)
 
 export default function TasdiqlanganTargibotlar() {
   const [list, setList]         = useState([])

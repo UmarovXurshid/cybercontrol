@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import api from '../api'
 import DateFilter from '../components/DateFilter'
+import { localDateStr, monthStartStr } from '../utils/date'
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
 
-const today      = new Date().toISOString().slice(0,10)
-const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10)
+const today      = localDateStr()
+const monthStart = monthStartStr()
 const CUR_YEAR   = new Date().getFullYear()
 
 function excelDownload(url, filename) {

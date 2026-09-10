@@ -1,12 +1,13 @@
 ﻿import { useEffect, useState } from 'react'
 import api from '../api'
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { localDateStr, monthStartStr, daysAgoStr } from '../utils/date'
 
 const CUR_YEAR   = new Date().getFullYear()
-const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10)
+const monthStart = monthStartStr()
 
-const today = new Date().toISOString().slice(0, 10)
-const thirtyDaysAgo = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0, 10)
+const today = localDateStr()
+const thirtyDaysAgo = daysAgoStr(30)
 
 function excelDownload(url, filename) {
   const token = localStorage.getItem('token')
@@ -393,7 +394,7 @@ function MahallalarTab({ start, end, viloyatlar, selViloyat, onSelViloyat }) {
 function SamaradorlikTab({ viloyatlar }) {
   const [rows, setRows]   = useState([])
   const [start, setStart] = useState(monthStart)
-  const [end, setEnd]     = useState(new Date().toISOString().slice(0,10))
+  const [end, setEnd]     = useState(today)
   const [vid, setVid]     = useState('')
 
   const load = (s=start, e=end, v=vid) =>
@@ -455,7 +456,7 @@ function SamaradorlikTab({ viloyatlar }) {
 function XavfliTab({ viloyatlar }) {
   const [rows, setRows]   = useState([])
   const [start, setStart] = useState(monthStart)
-  const [end, setEnd]     = useState(new Date().toISOString().slice(0,10))
+  const [end, setEnd]     = useState(today)
   const [vid, setVid]     = useState('')
 
   const load = (s=start, e=end, v=vid) =>

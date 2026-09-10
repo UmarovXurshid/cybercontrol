@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import api from '../api'
+import { localDateStr, daysAgoStr } from '../utils/date'
 
-const today = new Date().toISOString().slice(0, 10)
-const thirtyDaysAgo = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0, 10)
+const today = localDateStr()
+const thirtyDaysAgo = daysAgoStr(30)
 
 const AMAL_LABELS = {
   tasdiqlash:         { label: 'Tasdiqlash',        color: 'bg-green-100 text-green-700' },

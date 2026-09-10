@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import api from '../api'
 import toast from 'react-hot-toast'
+import { localDateStr } from '../utils/date'
 
-const today = new Date().toISOString().slice(0, 10)
+const today = localDateStr()
 const role  = () => localStorage.getItem('role')
 
 /* ── Isbот yuk­lash tugmasi ──────────────────────────────────────────────────── */

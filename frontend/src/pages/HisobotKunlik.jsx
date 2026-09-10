@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import api from '../api'
 import toast from 'react-hot-toast'
 import DateFilter from '../components/DateFilter'
+import { localDateStr } from '../utils/date'
 
-const today = new Date().toISOString().slice(0,10)
+const today = localDateStr()
 const KUNLAR = ['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba']
 
 /* ─── Xavfsiz va Sog'lom Yurt jadval ──────────────────────────────────────── */

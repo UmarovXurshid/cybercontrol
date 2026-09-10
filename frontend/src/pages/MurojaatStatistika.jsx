@@ -8,9 +8,10 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
+import { localDateStr, daysAgoStr } from '../utils/date'
 
-const today         = new Date().toISOString().slice(0, 10)
-const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+const today         = localDateStr()
+const thirtyDaysAgo = daysAgoStr(30)
 
 const GEO_URL = '/uz-viloyatlar.geojson'
 

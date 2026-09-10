@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import api from '../api'
 import toast from 'react-hot-toast'
 import { MurojaatStatBlok } from './MurojaatStatistika'
+import { localDateStr } from '../utils/date'
 
-const today = new Date().toISOString().slice(0, 10)
+const today = localDateStr()
 
 const JINSI_OPTIONS  = [['erkak','Erkak'],['ayol','Ayol']]
 const HOLAT_OPTIONS  = [

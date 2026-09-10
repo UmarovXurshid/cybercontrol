@@ -1,9 +1,10 @@
 ﻿import { useEffect, useState, Fragment } from 'react'
 import api from '../api'
 import DateFilter from '../components/DateFilter'
+import { localDateStr, daysAgoStr } from '../utils/date'
 
-const today = new Date().toISOString().slice(0,10)
-const thirtyDaysAgo = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0,10)
+const today = localDateStr()
+const thirtyDaysAgo = daysAgoStr(30)
 
 function excelDownload(url, filename) {
   const token = localStorage.getItem('token')

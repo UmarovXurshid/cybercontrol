@@ -4,6 +4,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import toast from 'react-hot-toast'
 import api from '../api'
+import { localDateStr, daysAgoStr } from '../utils/date'
 
 /* ── Leaflet ikon fix (Vite build) ──────────────────────────────────────── */
 delete L.Icon.Default.prototype._getIconUrl
@@ -452,9 +453,9 @@ function UmumiyStats({ data }) {
    🏠  ASOSIY SAHIFA
 ═════════════════════════════════════════════════════════════════════════════ */
 export default function Qamrov() {
-  const today      = new Date().toISOString().slice(0, 10)
+  const today      = localDateStr()
   // Default: oxirgi 30 kun (joriy oy boshi emas)
-  const thirtyDaysAgo = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0, 10)
+  const thirtyDaysAgo = daysAgoStr(30)
 
   const [tab, setTab]     = useState('xarita')
   const [start, setStart] = useState(thirtyDaysAgo)

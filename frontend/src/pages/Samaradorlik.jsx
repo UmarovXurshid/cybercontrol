@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import api from '../api'
 import DateFilter from '../components/DateFilter'
+import { localDateStr, monthStartStr } from '../utils/date'
 
-const today      = new Date().toISOString().slice(0,10)
-const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10)
+const today      = localDateStr()
+const monthStart = monthStartStr()
 
 export default function Samaradorlik() {
   const [data, setData]   = useState(null)

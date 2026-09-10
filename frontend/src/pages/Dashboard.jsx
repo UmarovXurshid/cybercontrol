@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import api from '../api'
+import { localDateStr, monthStartStr } from '../utils/date'
 import {
   BarChart, Bar, ComposedChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
 
-const today      = new Date().toISOString().slice(0, 10)
-const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
+const today      = localDateStr()
+const monthStart = monthStartStr()
 const CUR_YEAR    = new Date().getFullYear()
 const OY_QISQA    = ['','Yan','Fev','Mar','Apr','May','Iyun','Iyul','Avg','Sen','Okt','Noy','Dek']
 const COLORS      = ['#3c8dbc','#4caf50','#ff9800','#e53935','#8e24aa','#00897b','#f06292','#546e7a']

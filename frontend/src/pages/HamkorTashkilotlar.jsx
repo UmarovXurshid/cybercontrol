@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import api from '../api'
 import toast from 'react-hot-toast'
+import { localDateStr } from '../utils/date'
 
 const T_EMPTY = { nomi: '', turi: '', tuman: null, mahalla: null, viloyat: null, is_active: true }
 const X_EMPTY = { fio: '', lavozim: '', tel: '', tg_id: '', is_active: true }
 
-const today = new Date().toISOString().slice(0, 10)
+const today = localDateStr()
 const monthStart = today.slice(0, 8) + '01'
 
 export default function HamkorTashkilotlar() {
