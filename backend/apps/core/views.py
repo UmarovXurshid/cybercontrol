@@ -3102,7 +3102,8 @@ def _build_kunlik_holati_workbook(result, groups_key='viloyatlar', group_label='
     RED_F     = fill('F8CBCB')
     LT_BLUE   = fill('DEEAF1')
 
-    total_cols = 1 + len(sanalar) + 1 + 1  # Guruh + sanalar + ЖАМИ + Такрорий
+    n_dates = len(sanalar)
+    total_cols = 1 + n_dates * 2 + 1 + 1  # Guruh + (sana:Soni+Такр.)*n + ЖАМИ + Такрорий
 
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
     c = ws.cell(1, 1, f'{title}   ({start} — {end})')
@@ -3112,22 +3113,40 @@ def _build_kunlik_holati_workbook(result, groups_key='viloyatlar', group_label='
     c.border = mbrd
     ws.row_dimensions[1].height = 30
 
-    col_names = [group_label] + [f'{s[8:10]}.{s[5:7]}' for s in sanalar] + ['ЖАМИ', 'Такрорий']
-    for ci, h in enumerate(col_names, 1):
-        c = ws.cell(2, ci, h)
-        c.font = fnt(bold=True, color='FFFFFF', size=9)
-        c.fill = MID_BLUE
-        c.alignment = ctr
-        c.border = brd
-    ws.row_dimensions[2].height = 20
+    # 2-qator: guruh nomi va ЖАМИ/Такрорий rowSpan=2 bo'lib pastga birlashadi,
+    #          har bir sana esa colSpan=2 bo'lib "Soni"/"Такр." ustunlarini o'z ichiga oladi.
+    ws.merge_cells(start_row=2, start_column=1, end_row=3, end_column=1)
+    c = ws.cell(2, 1, group_label)
+    c.font = fnt(bold=True, color='FFFFFF', size=9); c.fill = MID_BLUE; c.alignment = ctr; c.border = brd
+
+    for di, s in enumerate(sanalar):
+        col = 2 + di * 2
+        ws.merge_cells(start_row=2, start_column=col, end_row=2, end_column=col + 1)
+        c = ws.cell(2, col, f'{s[8:10]}.{s[5:7]}')
+        c.font = fnt(bold=True, color='FFFFFF', size=9); c.fill = MID_BLUE; c.alignment = ctr; c.border = brd
+        for sub_ci, sub_h in ((col, 'Soni'), (col + 1, 'Такр.')):
+            c = ws.cell(3, sub_ci, sub_h)
+            c.font = fnt(color='FFFFFF', size=8); c.fill = MID_BLUE; c.alignment = ctr; c.border = brd
+
+    jami_col, takr_col = 2 + n_dates * 2, 3 + n_dates * 2
+    ws.merge_cells(start_row=2, start_column=jami_col, end_row=3, end_column=jami_col)
+    c = ws.cell(2, jami_col, 'ЖАМИ')
+    c.font = fnt(bold=True, color='FFFFFF', size=9); c.fill = MID_BLUE; c.alignment = ctr; c.border = brd
+    ws.merge_cells(start_row=2, start_column=takr_col, end_row=3, end_column=takr_col)
+    c = ws.cell(2, takr_col, 'Такрорий')
+    c.font = fnt(bold=True, color='FFFFFF', size=9); c.fill = MID_BLUE; c.alignment = ctr; c.border = brd
+
+    ws.row_dimensions[2].height = 18
+    ws.row_dimensions[3].height = 16
 
     ws.column_dimensions['A'].width = 26
-    for ci in range(len(sanalar)):
-        ws.column_dimensions[get_column_letter(2 + ci)].width = 8
-    ws.column_dimensions[get_column_letter(2 + len(sanalar))].width = 9
-    ws.column_dimensions[get_column_letter(3 + len(sanalar))].width = 10
+    for di in range(n_dates):
+        ws.column_dimensions[get_column_letter(2 + di * 2)].width = 6
+        ws.column_dimensions[get_column_letter(3 + di * 2)].width = 6
+    ws.column_dimensions[get_column_letter(jami_col)].width = 9
+    ws.column_dimensions[get_column_letter(takr_col)].width = 10
 
-    er = 3
+    er = 4
     for v in groups:
         row = data.get(v['id'], {})
         jami = sum(row.get(s, 0) or 0 for s in sanalar)
@@ -3136,22 +3155,25 @@ def _build_kunlik_holati_workbook(result, groups_key='viloyatlar', group_label='
         c.font = fnt(bold=True); c.alignment = lft; c.border = brd
 
         t_row = takroriy_kunlik.get(v['id'], {})
-        for ci, s in enumerate(sanalar):
+        for di, s in enumerate(sanalar):
             n  = row.get(s, 0) or 0
             tn = t_row.get(s, 0) or 0
-            val = n if n else '—'
-            if tn:
-                val = f'{val} ({tn})'
-            c = ws.cell(er, 2 + ci, val)
+            col = 2 + di * 2
+
+            c = ws.cell(er, col, n if n else '—')
             c.alignment = ctr; c.border = brd
             c.font = fnt(bold=(n == 0), color='C0392B' if n == 0 else '000000')
             if n == 0:
                 c.fill = RED_F
 
-        c = ws.cell(er, 2 + len(sanalar), jami)
+            c = ws.cell(er, col + 1, tn if tn else '')
+            c.alignment = ctr; c.border = brd
+            c.font = fnt(italic=True, color='888888', size=8)
+
+        c = ws.cell(er, jami_col, jami)
         c.font = fnt(bold=True); c.fill = LT_BLUE; c.alignment = ctr; c.border = brd
 
-        c = ws.cell(er, 3 + len(sanalar), takroriy.get(v['id'], 0) or 0)
+        c = ws.cell(er, takr_col, takroriy.get(v['id'], 0) or 0)
         c.font = fnt(italic=True, color='888888'); c.alignment = ctr; c.border = brd
 
         ws.row_dimensions[er].height = 16

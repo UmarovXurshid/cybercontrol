@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Fragment } from 'react'
 import api from '../api'
 import toast from 'react-hot-toast'
 import { localDateStr, monthStartStr } from '../utils/date'
@@ -402,15 +402,23 @@ export default function MurojaatHisobotTuman() {
                     <table className="w-full text-xs border-collapse">
                       <thead>
                         <tr style={{ background: '#1F4E79' }}>
-                          <th className="sticky left-0 z-10 px-3 py-3 text-white text-left font-semibold border border-blue-900 min-w-[200px]"
+                          <th rowSpan={2} className="sticky left-0 z-10 px-3 py-3 text-white text-left font-semibold border border-blue-900 min-w-[200px]"
                               style={{ background: '#1F4E79' }}>Tuman</th>
                           {kunlik.sanalar.map(s => (
-                            <th key={s} className="px-2 py-3 text-white text-center font-semibold border border-blue-900 min-w-[70px]">
+                            <th key={s} colSpan={2} className="px-2 py-2 text-white text-center font-semibold border border-blue-900 min-w-[110px]">
                               {s.slice(8,10)}.{s.slice(5,7)}
                             </th>
                           ))}
-                          <th className="px-2 py-3 text-white text-center font-semibold border border-blue-900 min-w-[70px]">ЖАМИ</th>
-                          <th className="px-2 py-3 text-white text-center font-semibold border border-blue-900 min-w-[80px]">Такрорий</th>
+                          <th rowSpan={2} className="px-2 py-3 text-white text-center font-semibold border border-blue-900 min-w-[70px]">ЖАМИ</th>
+                          <th rowSpan={2} className="px-2 py-3 text-white text-center font-semibold border border-blue-900 min-w-[80px]">Такрорий</th>
+                        </tr>
+                        <tr style={{ background: '#2E75B6' }}>
+                          {kunlik.sanalar.map(s => (
+                            <Fragment key={s}>
+                              <th className="px-1 py-1 text-white text-center font-normal border border-blue-900 text-[10px]">Soni</th>
+                              <th className="px-1 py-1 text-white text-center font-normal border border-blue-900 text-[10px]">Такр.</th>
+                            </Fragment>
+                          ))}
                         </tr>
                       </thead>
                       <tbody>
@@ -430,11 +438,15 @@ export default function MurojaatHisobotTuman() {
                                 const n  = row[s] || 0
                                 const tn = tRow[s] || 0
                                 return (
-                                  <td key={s} className="px-2 py-1.5 text-center border border-gray-300"
-                                      style={{ color: n === 0 ? '#c62828' : '#1b1b1b', fontWeight: n === 0 ? 700 : 400 }}>
-                                    {n === 0 ? '—' : n}
-                                    {tn > 0 && <span className="text-gray-400 italic font-normal"> ({tn})</span>}
-                                  </td>
+                                  <Fragment key={s}>
+                                    <td className="px-2 py-1.5 text-center border border-gray-300"
+                                        style={{ color: n === 0 ? '#c62828' : '#1b1b1b', fontWeight: n === 0 ? 700 : 400 }}>
+                                      {n === 0 ? '—' : n}
+                                    </td>
+                                    <td className="px-2 py-1.5 text-center border border-gray-300 text-gray-400 italic">
+                                      {tn > 0 ? tn : ''}
+                                    </td>
+                                  </Fragment>
                                 )
                               })}
                               <td className="px-2 py-1.5 text-center border border-gray-300 font-semibold" style={{ background: '#DEEAF1' }}>
