@@ -3000,7 +3000,18 @@ def _compute_kunlik_holati(start, end, group_ids, vf, group_field='viloyat_id'):
     for row in tq:
         takroriy[row[group_field]] = row['n']
 
-    return sanalar, data, takroriy, start, end, kesildimi
+    # Kunlar kesimida takroriy murojaatlar — har bir kun ustunida asosiy son yoniga yoziladi
+    tq_kunlik = Murojaat.objects.filter(sana__gte=start, sana__lte=end, **{f'{group_field}__in': group_ids},
+                                         holat='takroriy', **vf) \
+                                 .values(group_field, 'sana').annotate(n=Count('id'))
+    takroriy_kunlik = {gid: {s: 0 for s in sanalar} for gid in group_ids}
+    for row in tq_kunlik:
+        gid = row[group_field]
+        s   = row['sana'].isoformat() if hasattr(row['sana'], 'isoformat') else row['sana']
+        if gid in takroriy_kunlik and s in takroriy_kunlik[gid]:
+            takroriy_kunlik[gid][s] = row['n']
+
+    return sanalar, data, takroriy, takroriy_kunlik, start, end, kesildimi
 
 
 def _kunlik_holati_data(request):
@@ -3012,10 +3023,11 @@ def _kunlik_holati_data(request):
     v_ids = [v['id'] for v in viloyatlar]
     vf = get_viloyat_qs_filter(request, 'viloyat_id')
 
-    sanalar, data, takroriy, start, end, kesildimi = _compute_kunlik_holati(start, end, v_ids, vf, 'viloyat_id')
+    sanalar, data, takroriy, takroriy_kunlik, start, end, kesildimi = _compute_kunlik_holati(start, end, v_ids, vf, 'viloyat_id')
 
     return {
         'viloyatlar': viloyatlar, 'sanalar': sanalar, 'data': data, 'takroriy': takroriy,
+        'takroriy_kunlik': takroriy_kunlik,
         'start': start, 'end': end, 'kesildimi': kesildimi,
     }
 
@@ -3035,10 +3047,11 @@ def _kunlik_holati_tuman_data(request):
     if tuman_id:
         vf['tuman_id'] = int(tuman_id)
 
-    sanalar, data, takroriy, start, end, kesildimi = _compute_kunlik_holati(start, end, t_ids, vf, 'tuman_id')
+    sanalar, data, takroriy, takroriy_kunlik, start, end, kesildimi = _compute_kunlik_holati(start, end, t_ids, vf, 'tuman_id')
 
     return {
         'tumanlar': tumanlar, 'sanalar': sanalar, 'data': data, 'takroriy': takroriy,
+        'takroriy_kunlik': takroriy_kunlik,
         'start': start, 'end': end, 'kesildimi': kesildimi,
     }
 
@@ -3066,6 +3079,7 @@ def _build_kunlik_holati_workbook(result, groups_key='viloyatlar', group_label='
 
     groups, sanalar, data = result[groups_key], result['sanalar'], result['data']
     takroriy = result.get('takroriy', {})
+    takroriy_kunlik = result.get('takroriy_kunlik', {})
     start, end = result['start'], result['end']
 
     wb = Workbook()
@@ -3121,9 +3135,14 @@ def _build_kunlik_holati_workbook(result, groups_key='viloyatlar', group_label='
         c = ws.cell(er, 1, v['nomi'])
         c.font = fnt(bold=True); c.alignment = lft; c.border = brd
 
+        t_row = takroriy_kunlik.get(v['id'], {})
         for ci, s in enumerate(sanalar):
-            n = row.get(s, 0) or 0
-            c = ws.cell(er, 2 + ci, n if n else '—')
+            n  = row.get(s, 0) or 0
+            tn = t_row.get(s, 0) or 0
+            val = n if n else '—'
+            if tn:
+                val = f'{val} ({tn})'
+            c = ws.cell(er, 2 + ci, val)
             c.alignment = ctr; c.border = brd
             c.font = fnt(bold=(n == 0), color='C0392B' if n == 0 else '000000')
             if n == 0:

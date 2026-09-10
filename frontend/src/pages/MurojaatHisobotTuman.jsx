@@ -415,7 +415,8 @@ export default function MurojaatHisobotTuman() {
                       </thead>
                       <tbody>
                         {kunlik.tumanlar.map((t, idx) => {
-                          const row = kunlik.data[t.id] || {}
+                          const row  = kunlik.data[t.id] || {}
+                          const tRow = kunlik.takroriy_kunlik?.[t.id] || {}
                           const jami = kunlik.sanalar.reduce((sum, s) => sum + (row[s] || 0), 0)
                           const takroriy = kunlik.takroriy?.[t.id] || 0
                           const bg = idx % 2 === 0 ? '#FFFFFF' : '#F2F2F2'
@@ -426,11 +427,13 @@ export default function MurojaatHisobotTuman() {
                                 {t.nomi}
                               </td>
                               {kunlik.sanalar.map(s => {
-                                const n = row[s] || 0
+                                const n  = row[s] || 0
+                                const tn = tRow[s] || 0
                                 return (
                                   <td key={s} className="px-2 py-1.5 text-center border border-gray-300"
                                       style={{ color: n === 0 ? '#c62828' : '#1b1b1b', fontWeight: n === 0 ? 700 : 400 }}>
                                     {n === 0 ? '—' : n}
+                                    {tn > 0 && <span className="text-gray-400 italic font-normal"> ({tn})</span>}
                                   </td>
                                 )
                               })}
