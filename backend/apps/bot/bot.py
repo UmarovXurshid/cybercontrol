@@ -75,12 +75,7 @@ def db_get_by_tg(tg_id):
             m_tuman = Mahalla.objects.filter(tuman_id=xodim.tashkilot.tuman_id, is_tuman=True).first()
             if m_tuman:
                 return None, m_tuman, xodim
-    qs = Mahalla.objects.filter(tg_id=tg_id)
-    # Bitta tg_id bir nechta mahallaga bog'langan bo'lishi mumkin (bitta odam
-    # bir nechta mahallaga inspektor bo'lsa). Shunday holatda hozir ochiq
-    # qoralamasi (draft) bor mahallani afzal ko'ramiz — chunki /start bosilganda
-    # aynan o'sha mahalla uchun yangi draft yaratiladi.
-    m = qs.filter(hisobot__status=0).first() or qs.first()
+    m = Mahalla.objects.filter(tg_id=tg_id).first()
     return None, m, None
 
 @sync_to_async
