@@ -2596,30 +2596,51 @@ def murojaat_import(request):
     except Exception:
         return Response({'error': 'Excel faylni o\'qib bo\'lmadi'}, status=400)
 
-    JINSI_MAP  = {'erkak': 'erkak', 'ayol': 'ayol', 'erkak ': 'erkak', 'ayol ': 'ayol',
-                  'эркак': 'erkak', 'аёл': 'ayol', 'м': 'erkak', 'ж': 'ayol'}
-    HOLAT_MAP  = {'yangi': 'yangi', 'takroriy': 'takroriy', 'aybi': 'aybi', 'togri': 'togri',
-                  'янги': 'yangi', 'такрорий': 'takroriy', "тўғридан тўғри ариза": 'togri'}
+    JINSI_MAP  = {'erkak': 'erkak', 'ayol': 'ayol', 'erkak ': 'erkak', 'ayol ': 'ayol'}
+    HOLAT_MAP  = {'yangi': 'yangi', 'takroriy': 'takroriy', 'aybi': 'aybi', 'togri': 'togri'}
     TARMOQ_MAP = {'telegram': 'telegram', 'instagram': 'instagram', 'facebook': 'facebook',
-                  'tiktok': 'tiktok', 'bigolive': 'bigolive', 'boshqa': 'boshqa',
-                  'телеграм': 'telegram', 'инстаграм': 'instagram', 'фейсбук': 'facebook',
-                  'тикток': 'tiktok', 'боshqa': 'boshqa', 'бошқа': 'boshqa'}
+                  'tiktok': 'tiktok', 'bigolive': 'bigolive', 'boshqa': 'boshqa'}
 
     # "ID-lar" varag'idagi tartib raqamlariga mos kodlar (murojaat_shablon bilan bir xil)
     JINSI_KOD  = {'1': 'erkak', '2': 'ayol'}
     HOLAT_KOD  = {'1': 'yangi', '2': 'takroriy', '3': 'aybi', '4': 'togri'}
     TARMOQ_KOD = {'1': 'telegram', '2': 'instagram', '3': 'facebook', '4': 'tiktok', '5': 'bigolive', '6': 'boshqa'}
 
+    # Kirilcha o'zbek harflarini lotinga o'giradi — viloyatlar ba'zan kirilcha yoki
+    # kirilcha/lotin aralash yozadi, bularni ham to'g'ri tanib olish uchun.
+    _KIRIL_LOTIN = {
+        'ё': 'yo', 'ж': 'j', 'ц': 's', 'ч': 'ch', 'ш': 'sh', 'щ': 'sh',
+        'ъ': "'", 'ы': 'i', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+        'ў': "o'", 'қ': 'q', 'ғ': "g'", 'ҳ': 'h',
+        'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e',
+        'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+        'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
+        'у': 'u', 'ф': 'f', 'х': 'x',
+    }
+
+    def kiril_lotin(s):
+        """Matndagi kirilcha harflarni lotinga o'giradi (lotin harflarga tegmaydi)."""
+        out = []
+        for ch in s:
+            rep = _KIRIL_LOTIN.get(ch.lower())
+            if rep is None:
+                out.append(ch)
+            elif ch.isupper() and len(rep) == 1:
+                out.append(rep.upper())
+            else:
+                out.append(rep)
+        return ''.join(out)
+
     usullar = list(MurojaatUsul.objects.all())
     kasblar = list(MurojaatKasb.objects.all())
 
     def topish(nomi, ro_yxat):
-        """ID (raqam) yoki nomi bo'yicha ro'yxatdan izlaydi."""
+        """ID (raqam) yoki nomi bo'yicha ro'yxatdan izlaydi (kirilcha/lotin aralash bo'lsa ham)."""
         if nomi is None or nomi == '':
             return None
         if isinstance(nomi, (int, float)):
             return next((item for item in ro_yxat if item.id == int(nomi)), None)
-        s = str(nomi).strip()
+        s = kiril_lotin(str(nomi).strip())
         if s.isdigit():
             return next((item for item in ro_yxat if item.id == int(s)), None)
         s = s.lower()
@@ -2632,12 +2653,13 @@ def murojaat_import(request):
         return None
 
     def kod_yoki_nomi(val, kod_map, nomi_map, default=''):
-        """ID (raqam) yoki nomi bo'yicha kod qiymatini qaytaradi (jinsi/holat/tarmoq uchun)."""
+        """ID (raqam) yoki nomi bo'yicha kod qiymatini qaytaradi (jinsi/holat/tarmoq uchun,
+        kirilcha/lotin aralash yozilgan bo'lsa ham)."""
         if val is None or val == '':
             return default
         if isinstance(val, (int, float)):
             return kod_map.get(str(int(val)), default)
-        s = str(val).strip()
+        s = kiril_lotin(str(val).strip())
         if s.isdigit():
             return kod_map.get(s, default)
         return nomi_map.get(s.lower(), default)
