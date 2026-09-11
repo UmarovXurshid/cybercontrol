@@ -6,7 +6,7 @@ from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from datetime import date, datetime, timedelta
-import os, io, re, requests, openpyxl
+import os, io, re, requests, openpyxl, base64
 from difflib import SequenceMatcher
 from concurrent.futures import ThreadPoolExecutor
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -2676,7 +2676,7 @@ def murojaat_import(request):
 
         try:
             if not sana:
-                errors.append({'qator': idx, 'sabab': 'Sana kiritilmagan'})
+                errors.append({'qator': idx, 'sabab': 'Sana kiritilmagan', 'row': row})
                 continue
             sana_val = sana.date() if hasattr(sana, 'date') else datetime.strptime(str(sana), '%Y-%m-%d').date()
 
@@ -2685,7 +2685,7 @@ def murojaat_import(request):
             else:
                 vil = Viloyat.objects.filter(nomi__icontains=str(viloyat_nomi or '').strip()).first()
                 if not vil:
-                    errors.append({'qator': idx, 'sabab': f'Viloyat topilmadi: {viloyat_nomi}'})
+                    errors.append({'qator': idx, 'sabab': f'Viloyat topilmadi: {viloyat_nomi}', 'row': row})
                     continue
                 viloyat_id = vil.id
 
@@ -2693,7 +2693,7 @@ def murojaat_import(request):
                 viloyat_id=viloyat_id, tuman_nomi__icontains=str(tuman_nomi or '').strip()
             ).first()
             if not tuman:
-                errors.append({'qator': idx, 'sabab': f'Tuman topilmadi: {tuman_nomi}'})
+                errors.append({'qator': idx, 'sabab': f'Tuman topilmadi: {tuman_nomi}', 'row': row})
                 continue
 
             mahalla = None
@@ -2705,10 +2705,10 @@ def murojaat_import(request):
                     if len(nomzodlar) == 1:
                         mahalla = nomzodlar[0]
                     elif len(nomzodlar) > 1:
-                        errors.append({'qator': idx, 'sabab': f"Mahalla noaniq (bir nechta mos keldi): {mahalla_nomi}"})
+                        errors.append({'qator': idx, 'sabab': f"Mahalla noaniq (bir nechta mos keldi): {mahalla_nomi}", 'row': row})
                         continue
                     else:
-                        errors.append({'qator': idx, 'sabab': f'Mahalla topilmadi: {mahalla_nomi}'})
+                        errors.append({'qator': idx, 'sabab': f'Mahalla topilmadi: {mahalla_nomi}', 'row': row})
                         continue
 
             usul = topish(usul_nomi, usullar)
@@ -2736,10 +2736,39 @@ def murojaat_import(request):
             )
             created += 1
         except Exception as e:
-            errors.append({'qator': idx, 'sabab': str(e)})
+            errors.append({'qator': idx, 'sabab': str(e), 'row': row})
+
+    xato_fayl_base64 = None
+    if errors:
+        xwb = openpyxl.Workbook()
+        xws = xwb.active
+        xws.title = 'Import'
+        header_font = Font(bold=True, color='FFFFFF')
+        header_fill = PatternFill('solid', fgColor='B91C1C')
+        headers = MUROJAAT_IMPORT_HEADERS + ['Xato sababi']
+        for col_idx, h in enumerate(headers, 1):
+            cell = xws.cell(row=1, column=col_idx, value=h)
+            cell.font = header_font
+            cell.fill = header_fill
+        out_row = 2
+        for er in errors:
+            row_qiymatlar = (list(er.get('row') or []) + [None] * 17)[:17]
+            for col_idx, val in enumerate(row_qiymatlar, 1):
+                xws.cell(row=out_row, column=col_idx, value=val)
+            xws.cell(row=out_row, column=len(headers), value=er['sabab'])
+            out_row += 1
+        for col in xws.columns:
+            max_len = max((len(str(c.value or '')) for c in col), default=0)
+            xws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+        xbuf = io.BytesIO()
+        xwb.save(xbuf)
+        xato_fayl_base64 = base64.b64encode(xbuf.getvalue()).decode('ascii')
+
+    for er in errors:
+        er.pop('row', None)
 
     audit(request, 'murojaat_import', f"{created} ta import qilindi, {len(errors)} ta xato")
-    return Response({'created': created, 'errors': errors})
+    return Response({'created': created, 'errors': errors, 'xato_fayl_base64': xato_fayl_base64})
 
 
 # ── Murojaat Hisobot ──────────────────────────────────────────────────────────

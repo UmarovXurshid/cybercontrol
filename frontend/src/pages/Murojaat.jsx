@@ -339,6 +339,20 @@ function MurojaatImport({ onDone }) {
     } catch { toast.error('Yuklab bo\'lmadi') }
   }
 
+  const xatolarniYuklab = () => {
+    if (!natija?.xato_fayl_base64) return
+    const bin = atob(natija.xato_fayl_base64)
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url
+    a.download = 'murojaat_import_xatolari.xlsx'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const faylTanlandi = async e => {
     const fayl = e.target.files?.[0]
     e.target.value = ''
@@ -385,6 +399,14 @@ function MurojaatImport({ onDone }) {
                   <li key={i}>{er.qator}-qator: {er.sabab}</li>
                 ))}
               </ul>
+              {natija.xato_fayl_base64 && (
+                <button
+                  onClick={xatolarniYuklab}
+                  className="mt-2 px-3 py-1.5 border border-red-300 rounded-lg text-sm text-red-700 bg-white hover:bg-red-50"
+                >
+                  ❌ Xato qatorlarni Excel qilib yuklab olish
+                </button>
+              )}
             </div>
           )}
         </div>
