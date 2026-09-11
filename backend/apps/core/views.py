@@ -2596,10 +2596,14 @@ def murojaat_import(request):
     except Exception:
         return Response({'error': 'Excel faylni o\'qib bo\'lmadi'}, status=400)
 
-    JINSI_MAP  = {'erkak': 'erkak', 'ayol': 'ayol', 'erkak ': 'erkak', 'ayol ': 'ayol'}
-    HOLAT_MAP  = {'yangi': 'yangi', 'takroriy': 'takroriy', 'aybi': 'aybi', 'togri': 'togri'}
+    JINSI_MAP  = {'erkak': 'erkak', 'ayol': 'ayol', 'erkak ': 'erkak', 'ayol ': 'ayol',
+                  'эркак': 'erkak', 'аёл': 'ayol', 'м': 'erkak', 'ж': 'ayol'}
+    HOLAT_MAP  = {'yangi': 'yangi', 'takroriy': 'takroriy', 'aybi': 'aybi', 'togri': 'togri',
+                  'янги': 'yangi', 'такрорий': 'takroriy', "тўғридан тўғри ариза": 'togri'}
     TARMOQ_MAP = {'telegram': 'telegram', 'instagram': 'instagram', 'facebook': 'facebook',
-                  'tiktok': 'tiktok', 'bigolive': 'bigolive', 'boshqa': 'boshqa'}
+                  'tiktok': 'tiktok', 'bigolive': 'bigolive', 'boshqa': 'boshqa',
+                  'телеграм': 'telegram', 'инстаграм': 'instagram', 'фейсбук': 'facebook',
+                  'тикток': 'tiktok', 'боshqa': 'boshqa', 'бошқа': 'boshqa'}
 
     # "ID-lar" varag'idagi tartib raqamlariga mos kodlar (murojaat_shablon bilan bir xil)
     JINSI_KOD  = {'1': 'erkak', '2': 'ayol'}
