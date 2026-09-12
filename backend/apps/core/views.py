@@ -2496,10 +2496,10 @@ def murojaat_shablon(request):
 
     misol = [
         '2026-01-15', 'Toshkent viloyati', 'Chirchiq', 'Guliston MFY',
-        'Aliyev Vali Aliyevich', 1, 35, '+998901234567',
-        usul_pairs[0][0] if usul_pairs else '', kasb_pairs[0][0] if kasb_pairs else '',
-        '', '', '', 1,
-        1500000, 1, "Qisqacha voqea bayoni...",
+        'Aliyev Vali Aliyevich', 'Erkak', 35, '+998901234567',
+        (usul_pairs[0][1].strip() if usul_pairs else ''), (kasb_pairs[0][1] if kasb_pairs else ''),
+        '', '', '', 'Telegram',
+        1500000, 'Yangi', "Qisqacha voqea bayoni...",
     ]
 
     wb = openpyxl.Workbook()
@@ -2550,21 +2550,21 @@ def murojaat_shablon(request):
     lst_ws = wb.create_sheet('Royxatlar')
     lst_ws.sheet_state = 'hidden'
 
-    usul_idlar   = [p[0] for p in usul_pairs]
-    kasb_idlar   = [p[0] for p in kasb_pairs]
-    jinsi_idlar  = [p[0] for p in jinsi_pairs]
-    holat_idlar  = [p[0] for p in holat_pairs]
-    tarmoq_idlar = [p[0] for p in tarmoq_pairs]
+    usul_nomlari   = [p[1].strip() for p in usul_pairs]
+    kasb_nomlari   = [p[1] for p in kasb_pairs]
+    jinsi_nomlari  = [p[1] for p in jinsi_pairs]
+    holat_nomlari  = [p[1] for p in holat_pairs]
+    tarmoq_nomlari = [p[1] for p in tarmoq_pairs]
 
-    # Ustunlar: 1=Viloyat 2=Tuman 3=Mahalla 4=Usul(ID) 5=Kasb(ID) 6=Jinsi(ID) 7=Holat(ID) 8=Tarmoq(ID)
+    # Ustunlar: 1=Viloyat 2=Tuman 3=Mahalla 4=Usul(Nomi) 5=Kasb(Nomi) 6=Jinsi(Nomi) 7=Holat(Nomi) 8=Tarmoq(Nomi)
     _add_list_validation(ws, lst_ws, 1, 'B', viloyat_nomlari)
     _add_list_validation(ws, lst_ws, 2, 'C', tuman_nomlari)
     _add_list_validation(ws, lst_ws, 3, 'D', mahalla_nomlari)
-    _add_list_validation(ws, lst_ws, 4, 'I', usul_idlar)
-    _add_list_validation(ws, lst_ws, 5, 'J', kasb_idlar)
-    _add_list_validation(ws, lst_ws, 6, 'F', jinsi_idlar)
-    _add_list_validation(ws, lst_ws, 7, 'P', holat_idlar)
-    _add_list_validation(ws, lst_ws, 8, 'N', tarmoq_idlar)
+    _add_list_validation(ws, lst_ws, 4, 'I', usul_nomlari)
+    _add_list_validation(ws, lst_ws, 5, 'J', kasb_nomlari)
+    _add_list_validation(ws, lst_ws, 6, 'F', jinsi_nomlari)
+    _add_list_validation(ws, lst_ws, 7, 'P', holat_nomlari)
+    _add_list_validation(ws, lst_ws, 8, 'N', tarmoq_nomlari)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -2596,11 +2596,6 @@ def murojaat_import(request):
     except Exception:
         return Response({'error': 'Excel faylni o\'qib bo\'lmadi'}, status=400)
 
-    JINSI_MAP  = {'erkak': 'erkak', 'ayol': 'ayol', 'erkak ': 'erkak', 'ayol ': 'ayol'}
-    HOLAT_MAP  = {'yangi': 'yangi', 'takroriy': 'takroriy', 'aybi': 'aybi', 'togri': 'togri'}
-    TARMOQ_MAP = {'telegram': 'telegram', 'instagram': 'instagram', 'facebook': 'facebook',
-                  'tiktok': 'tiktok', 'bigolive': 'bigolive', 'boshqa': 'boshqa'}
-
     # "ID-lar" varag'idagi tartib raqamlariga mos kodlar (murojaat_shablon bilan bir xil)
     JINSI_KOD  = {'1': 'erkak', '2': 'ayol'}
     HOLAT_KOD  = {'1': 'yangi', '2': 'takroriy', '3': 'aybi', '4': 'togri'}
@@ -2631,6 +2626,31 @@ def murojaat_import(request):
                 out.append(rep)
         return ''.join(out)
 
+    def norm(s):
+        """Solishtirish uchun matnni soddalashtiradi: kirilchani lotinga o'giradi,
+        kichik harfga o'tkazadi, apostrof/tinish belgilarini olib tashlaydi va
+        ortiqcha bo'shliqlarni yig'adi (shablondagi to'liq nomlar ham tanilishi uchun)."""
+        s = kiril_lotin(str(s)).lower()
+        s = re.sub(r"[\'\u2018\u2019\u02bc`\"]", '', s)
+        s = re.sub(r'\s+', ' ', s).strip()
+        return s
+
+    # Shablondagi dropdown nomlari (murojaat_shablon dagi jinsi/holat/tarmoq_pairs bilan bir xil),
+    # to'liq matn yozilsa ham (masalan "Takroriy murojaat") to'g'ri tanish uchun.
+    JINSI_MAP = {norm('Erkak'): 'erkak', norm('Ayol'): 'ayol'}
+    HOLAT_MAP = {
+        norm('Yangi'): 'yangi',
+        norm('Takroriy'): 'takroriy', norm('Takroriy murojaat'): 'takroriy',
+        norm('Aybi'): 'aybi', norm("Fuqaroning o'z aybi"): 'aybi',
+        norm('Togri'): 'togri', norm("To'g'ridan to'g'ri ariza"): 'togri',
+    }
+    TARMOQ_MAP = {
+        norm('Telegram'): 'telegram', norm('Instagram'): 'instagram', norm('Facebook'): 'facebook',
+        norm('Tiktok'): 'tiktok', norm('TikTok'): 'tiktok',
+        norm('Bigolive'): 'bigolive', norm('Bigo Live'): 'bigolive',
+        norm('Boshqa'): 'boshqa',
+    }
+
     usullar = list(MurojaatUsul.objects.all())
     kasblar = list(MurojaatKasb.objects.all())
 
@@ -2643,18 +2663,18 @@ def murojaat_import(request):
         s = kiril_lotin(str(nomi).strip())
         if s.isdigit():
             return next((item for item in ro_yxat if item.id == int(s)), None)
-        s = s.lower()
+        s = norm(s)
         for item in ro_yxat:
-            if item.nomi.strip().lower() == s:
+            if norm(item.nomi) == s:
                 return item
         for item in ro_yxat:
-            if s in item.nomi.strip().lower():
+            if s in norm(item.nomi):
                 return item
         return None
 
     def kod_yoki_nomi(val, kod_map, nomi_map, default=''):
         """ID (raqam) yoki nomi bo'yicha kod qiymatini qaytaradi (jinsi/holat/tarmoq uchun,
-        kirilcha/lotin aralash yozilgan bo'lsa ham)."""
+        kirilcha/lotin aralash yoki to'liq nom yozilgan bo'lsa ham)."""
         if val is None or val == '':
             return default
         if isinstance(val, (int, float)):
@@ -2662,7 +2682,7 @@ def murojaat_import(request):
         s = kiril_lotin(str(val).strip())
         if s.isdigit():
             return kod_map.get(s, default)
-        return nomi_map.get(s.lower(), default)
+        return nomi_map.get(norm(s), default)
 
     created = 0
     errors  = []
