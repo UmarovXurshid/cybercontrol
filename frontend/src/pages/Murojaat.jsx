@@ -367,6 +367,7 @@ function MurojaatImport({ onDone }) {
       })
       setNatija(data)
       if (data.created > 0) toast.success(`${data.created} ta murojaat import qilindi`)
+      if (data.skipped > 0) toast(`${data.skipped} ta qator takroriy bo'lgani uchun o'tkazib yuborildi`, { icon: '⚠️' })
       if (data.errors?.length) toast.error(`${data.errors.length} ta qatorda xato bor`)
       onDone?.()
     } catch (e) {
@@ -391,6 +392,9 @@ function MurojaatImport({ onDone }) {
       {natija && (
         <div className="mt-3 text-sm">
           <p className="text-green-700">✅ {natija.created} ta murojaat qo'shildi.</p>
+          {natija.skipped > 0 && (
+            <p className="text-amber-600">⚠️ {natija.skipped} ta qator takroriy bo'lgani uchun o'tkazib yuborildi (avval kiritilgan).</p>
+          )}
           {natija.errors?.length > 0 && (
             <div className="mt-2 text-red-600">
               <p className="font-medium">❌ {natija.errors.length} ta qatorda xato:</p>

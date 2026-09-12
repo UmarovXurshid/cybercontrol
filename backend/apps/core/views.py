@@ -2685,6 +2685,7 @@ def murojaat_import(request):
         return nomi_map.get(norm(s), default)
 
     created = 0
+    skipped = 0
     errors  = []
     rows = list(ws.iter_rows(min_row=2, values_only=True))
     for idx, row in enumerate(rows, start=2):
@@ -2730,6 +2731,28 @@ def murojaat_import(request):
                     else:
                         errors.append({'qator': idx, 'sabab': f'Mahalla topilmadi: {mahalla_nomi}', 'row': row})
                         continue
+
+            # Takroriy qatorni aniqlash — bir xil viloyat/tuman/sana bo'yicha F.I.SH
+            # (yoki F.I.SH bo'lmasa telefon) allaqachon kiritilgan bo'lsa, qayta qo'shmaydi
+            # (faylni qayta yuklaganda avval qo'shilganlar ustma-ust yozilib ketmasligi uchun).
+            fish_norm   = _fish_normalize(fish)
+            telefon_str = str(telefon or '').strip()
+            takror = False
+            if fish_norm:
+                mavjud_qs = Murojaat.objects.filter(
+                    viloyat_id=viloyat_id, tuman_id=tuman.id, sana=sana_val
+                ).exclude(fish='')
+                for m in mavjud_qs:
+                    if _fish_normalize(m.fish) == fish_norm:
+                        takror = True
+                        break
+            elif telefon_str:
+                takror = Murojaat.objects.filter(
+                    viloyat_id=viloyat_id, tuman_id=tuman.id, sana=sana_val, telefon=telefon_str
+                ).exists()
+            if takror:
+                skipped += 1
+                continue
 
             usul = topish(usul_nomi, usullar)
             kasb = topish(kasb_nomi, kasblar)
@@ -2787,8 +2810,8 @@ def murojaat_import(request):
     for er in errors:
         er.pop('row', None)
 
-    audit(request, 'murojaat_import', f"{created} ta import qilindi, {len(errors)} ta xato")
-    return Response({'created': created, 'errors': errors, 'xato_fayl_base64': xato_fayl_base64})
+    audit(request, 'murojaat_import', f"{created} ta import qilindi, {skipped} ta takroriy o'tkazib yuborildi, {len(errors)} ta xato")
+    return Response({'created': created, 'skipped': skipped, 'errors': errors, 'xato_fayl_base64': xato_fayl_base64})
 
 
 # ── Murojaat Hisobot ──────────────────────────────────────────────────────────
