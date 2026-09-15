@@ -5,6 +5,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from datetime import date, datetime, timedelta
 import os, io, re, requests, openpyxl, base64
 from difflib import SequenceMatcher
@@ -94,15 +95,25 @@ def excel_response(headers, rows, filename, extra_sheet=None):
     resp['Content-Disposition'] = f'attachment; filename="{filename}"'
     return resp
 
-# ── Viloyat filter yordamchilari ──────────────────────────────────────────────
-def get_viloyat_qs_filter(request, prefix='mahalla__tuman__viloyat_id'):
+# ── Viloyat/tuman filter yordamchilari ────────────────────────────────────────
+def get_viloyat_qs_filter(request, prefix='mahalla__tuman__viloyat_id', tuman_prefix=None):
     """
-    ORM queryset uchun viloyat filteri.
+    ORM queryset uchun viloyat (yoki tuman-admin uchun tuman) filteri.
     prefix:
       Hisobot  → 'mahalla__tuman__viloyat_id' (default)
       Mahalla  → 'tuman__viloyat_id'
       Tuman    → 'viloyat_id'
+    tuman_prefix — tuman-admin uchun mos join yo'li. Berilmasa va `prefix`
+    '...tuman__viloyat_id' bilan tugasa, avtomatik hosil qilinadi
+    ('mahalla__tuman__viloyat_id' → 'mahalla__tuman__id'). Boshqa prefixlarda
+    (masalan to'g'ridan-to'g'ri 'viloyat_id') aniq ko'rsatilishi shart.
     """
+    if request.user.role == 'tuman':
+        tp = tuman_prefix
+        if tp is None and prefix.endswith('tuman__viloyat_id'):
+            tp = prefix[:-len('viloyat_id')] + 'id'
+        if tp:
+            return {tp: request.user.tuman_id}
     if request.user.role == 'viloyat':
         return {prefix: request.user.viloyat_id}
     vid = request.GET.get('viloyat')
@@ -111,8 +122,10 @@ def get_viloyat_qs_filter(request, prefix='mahalla__tuman__viloyat_id'):
 def get_viloyat_sql(request):
     """
     Raw SQL uchun (extra_where, extra_params).
-    extra_where: ' AND tuman.viloyat_id = %s' yoki ''
+    extra_where: ' AND tuman.viloyat_id = %s' / ' AND tuman.id = %s' yoki ''
     """
+    if request.user.role == 'tuman':
+        return ' AND tuman.id = %s', [request.user.tuman_id]
     if request.user.role == 'viloyat':
         return ' AND tuman.viloyat_id = %s', [request.user.viloyat_id]
     vid = request.GET.get('viloyat')
@@ -205,7 +218,7 @@ def yangi_targibotlar(request):
         qs_oav = Hisobot.objects.filter(
             status=1, targibot_turi__gte=3, mahalla__is_viloyat=True
         ).select_related('mahalla__tuman__viloyat').prefetch_related('rasmlar')
-    elif role == 'viloyat':
+    elif role in ('viloyat', 'tuman'):
         qs_reg = Hisobot.objects.filter(
             status=1, targibot_turi__in=[1, 2], **vf
         ).select_related('mahalla__tuman__viloyat').prefetch_related('rasmlar')
@@ -232,7 +245,7 @@ def tasdiqlash(request):
     # respublika — hammasini + OAV (is_viloyat=True)
     role = request.user.role
     base_qs = Hisobot.objects.filter(id__in=tasdiqlangan + rad)
-    if role == 'viloyat':
+    if role in ('viloyat', 'tuman'):
         allowed = base_qs.filter(**vf, mahalla__is_viloyat=False).values_list('id', flat=True)
     elif role == 'respublika':
         allowed = base_qs.filter(mahalla__is_viloyat=True).values_list('id', flat=True)
@@ -910,8 +923,10 @@ def audit_log_list(request):
     if amal:
         qs = qs.filter(amal=amal)
 
-    # Viloyat admin faqat o'z loglarini ko'radi
-    if request.user.role == 'viloyat':
+    # Viloyat/tuman admin faqat o'z loglarini ko'radi
+    if request.user.role == 'tuman':
+        qs = qs.filter(user__tuman_id=request.user.tuman_id)
+    elif request.user.role == 'viloyat':
         qs = qs.filter(user__viloyat_id=request.user.viloyat_id)
 
     data = [{
@@ -1006,7 +1021,7 @@ class TumanViewSet(viewsets.ModelViewSet):
     permission_classes  = [IsAuthenticated]
 
     def get_queryset(self):
-        vf = get_viloyat_qs_filter(self.request, 'viloyat_id')
+        vf = get_viloyat_qs_filter(self.request, 'viloyat_id', tuman_prefix='id')
         return Tuman.objects.filter(**vf)
 
     def perform_create(self, serializer):
@@ -1039,20 +1054,38 @@ class ViloyatViewSet(viewsets.ModelViewSet):
     permission_classes  = [IsAuthenticated, IsRespublika]
 
 # ── Foydalanuvchilar CRUD (faqat respublika) ──────────────────────────────────
+def _tuman_admin_ruxsat_etilganmi(tuman):
+    """Tuman-admin akkaunti faqat 'faqat_shahar_tumani' belgilangan viloyat (Toshkent shahar) tumanlari uchun yaratiladi."""
+    return bool(tuman and tuman.viloyat_id and tuman.viloyat.faqat_shahar_tumani)
+
+
 class FoydalanuvchiViewSet(viewsets.ModelViewSet):
     queryset            = User.objects.all().order_by('id')
     serializer_class    = FoydalanuvchiSerializer
     permission_classes  = [IsAuthenticated, IsRespublika]
 
     def perform_create(self, serializer):
-        user = serializer.save()
+        extra = {}
+        if serializer.validated_data.get('role') == 'tuman':
+            tuman = serializer.validated_data.get('tuman')
+            if not _tuman_admin_ruxsat_etilganmi(tuman):
+                raise ValidationError({'tuman': "Tuman admin faqat Toshkent shahar tumanlari uchun yaratiladi"})
+            extra['viloyat_id'] = tuman.viloyat_id  # tuman admin uchun viloyat avtomatik tumanidan olinadi
+        user = serializer.save(**extra)
         parol = self.request.data.get('parol')
         if parol:
             user.set_password(parol)
             user.save()
 
     def perform_update(self, serializer):
-        user = serializer.save()
+        role = serializer.validated_data.get('role', serializer.instance.role)
+        extra = {}
+        if role == 'tuman':
+            tuman = serializer.validated_data.get('tuman', serializer.instance.tuman)
+            if not _tuman_admin_ruxsat_etilganmi(tuman):
+                raise ValidationError({'tuman': "Tuman admin faqat Toshkent shahar tumanlari uchun yaratiladi"})
+            extra['viloyat_id'] = tuman.viloyat_id
+        user = serializer.save(**extra)
         parol = self.request.data.get('parol')
         if parol:
             user.set_password(parol)
@@ -1064,11 +1097,13 @@ class HamkorTashkilotViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        vf = get_viloyat_qs_filter(self.request, 'viloyat_id')
+        vf = get_viloyat_qs_filter(self.request, 'viloyat_id', tuman_prefix='tuman_id')
         return HamkorTashkilot.objects.select_related('viloyat').prefetch_related('xodimlar').filter(**vf)
 
     def perform_create(self, serializer):
-        if self.request.user.role == 'viloyat' and not serializer.validated_data.get('viloyat'):
+        if self.request.user.role == 'tuman' and not serializer.validated_data.get('tuman'):
+            serializer.save(viloyat_id=self.request.user.viloyat_id, tuman_id=self.request.user.tuman_id)
+        elif self.request.user.role == 'viloyat' and not serializer.validated_data.get('viloyat'):
             serializer.save(viloyat_id=self.request.user.viloyat_id)
         else:
             serializer.save()
@@ -1083,7 +1118,7 @@ class HamkorXodimViewSet(viewsets.ModelViewSet):
         tashkilot_id = self.request.GET.get('tashkilot')
         if tashkilot_id:
             qs = qs.filter(tashkilot_id=tashkilot_id)
-        vf = get_viloyat_qs_filter(self.request, 'tashkilot__viloyat_id')
+        vf = get_viloyat_qs_filter(self.request, 'tashkilot__viloyat_id', tuman_prefix='tashkilot__tuman_id')
         return qs.filter(**vf)
 
 
@@ -1858,7 +1893,7 @@ def kunlik_ishlar_excel(request):  # noqa: C901
     role = request.user.role
     viloyat_filter = ''
     sql_params = [start_str, end_str]
-    if role == 'viloyat' and request.user.viloyat_id:
+    if role in ('viloyat', 'tuman') and request.user.viloyat_id:
         viloyat_filter = f'AND v.id = {int(request.user.viloyat_id)}'
 
     # ── Bot SQL ───────────────────────────────────────────────────────────────
@@ -2220,7 +2255,7 @@ def murojaat_fish_tekshir(request):
         return Response({'topildi': False, 'natijalar': []})
 
     exclude_id = request.GET.get('exclude_id')
-    vf = get_viloyat_qs_filter(request, 'viloyat_id')
+    vf = get_viloyat_qs_filter(request, 'viloyat_id', tuman_prefix='tuman_id')
     qs = Murojaat.objects.filter(**vf).exclude(fish='').select_related('tuman', 'mahalla', 'usul', 'kasb')
     if exclude_id:
         qs = qs.exclude(pk=exclude_id)
@@ -2276,7 +2311,7 @@ def murojaat_fish_tekshir(request):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def murojaat_list_create(request):
-    vf = get_viloyat_qs_filter(request, 'viloyat_id')
+    vf = get_viloyat_qs_filter(request, 'viloyat_id', tuman_prefix='tuman_id')
 
     if request.method == 'GET':
         start   = request.GET.get('start')
@@ -2385,7 +2420,10 @@ def murojaat_list_create(request):
 
     # POST — yangi murojaat qo'shish
     data = request.data.copy()
-    if request.user.role == 'viloyat':
+    if request.user.role == 'tuman':
+        data['viloyat'] = request.user.viloyat_id
+        data['tuman']   = request.user.tuman_id
+    elif request.user.role == 'viloyat':
         data['viloyat'] = request.user.viloyat_id
     ser = MurojaatSerializer(data=data)
     if not ser.is_valid():
@@ -2421,7 +2459,9 @@ def murojaat_detail(request, pk):
         obj = Murojaat.objects.get(pk=pk)
     except Murojaat.DoesNotExist:
         return Response({'error': 'Topilmadi'}, status=404)
-    # Viloyat admin faqat o'z viloyatini ko'ra/o'zgartira oladi
+    # Viloyat/tuman admin faqat o'z hududini ko'ra/o'zgartira oladi
+    if request.user.role == 'tuman' and obj.tuman_id != request.user.tuman_id:
+        return Response({'error': 'Ruxsat yo\'q'}, status=403)
     if request.user.role == 'viloyat' and obj.viloyat_id != request.user.viloyat_id:
         return Response({'error': 'Ruxsat yo\'q'}, status=403)
 
@@ -2472,7 +2512,12 @@ def _add_list_validation(ws, lst_ws, col_idx, col_letter, values, first_row=2, l
 def murojaat_shablon(request):
     """GET /api/murojaat/shablon/ — import uchun tanlov ro'yxatlari (dropdown) bilan Excel shablon."""
     role = request.user.role
-    if role == 'viloyat':
+    if role == 'tuman':
+        tuman_id        = request.user.tuman_id
+        viloyat_nomlari = list(Viloyat.objects.filter(id=request.user.viloyat_id).values_list('nomi', flat=True))
+        tuman_nomlari   = list(Tuman.objects.filter(id=tuman_id).values_list('tuman_nomi', flat=True))
+        mahalla_nomlari = list(Mahalla.objects.filter(tuman_id=tuman_id).order_by('mahalla_nomi').values_list('mahalla_nomi', flat=True))
+    elif role == 'viloyat':
         viloyat_id      = request.user.viloyat_id
         viloyat_nomlari = list(Viloyat.objects.filter(id=viloyat_id).values_list('nomi', flat=True))
         tuman_nomlari   = list(Tuman.objects.filter(viloyat_id=viloyat_id).order_by('tuman_nomi').values_list('tuman_nomi', flat=True))
@@ -2701,18 +2746,22 @@ def murojaat_import(request):
                 continue
             sana_val = sana.date() if hasattr(sana, 'date') else datetime.strptime(str(sana), '%Y-%m-%d').date()
 
-            if role == 'viloyat':
+            if role == 'tuman':
                 viloyat_id = request.user.viloyat_id
+                tuman = Tuman.objects.filter(id=request.user.tuman_id).first()
             else:
-                vil = Viloyat.objects.filter(nomi__icontains=str(viloyat_nomi or '').strip()).first()
-                if not vil:
-                    errors.append({'qator': idx, 'sabab': f'Viloyat topilmadi: {viloyat_nomi}', 'row': row})
-                    continue
-                viloyat_id = vil.id
+                if role == 'viloyat':
+                    viloyat_id = request.user.viloyat_id
+                else:
+                    vil = Viloyat.objects.filter(nomi__icontains=str(viloyat_nomi or '').strip()).first()
+                    if not vil:
+                        errors.append({'qator': idx, 'sabab': f'Viloyat topilmadi: {viloyat_nomi}', 'row': row})
+                        continue
+                    viloyat_id = vil.id
 
-            tuman = Tuman.objects.filter(
-                viloyat_id=viloyat_id, tuman_nomi__icontains=str(tuman_nomi or '').strip()
-            ).first()
+                tuman = Tuman.objects.filter(
+                    viloyat_id=viloyat_id, tuman_nomi__icontains=str(tuman_nomi or '').strip()
+                ).first()
             if not tuman:
                 errors.append({'qator': idx, 'sabab': f'Tuman topilmadi: {tuman_nomi}', 'row': row})
                 continue
@@ -2826,8 +2875,8 @@ def _cnt(qs, v_ids, group_field='viloyat_id'):
 
 
 def _hisobot_viloyatlar(request):
-    """Hisobotda ko'rsatiladigan viloyatlar ro'yxati — viloyat rolidagi foydalanuvchi faqat o'zinikini ko'radi."""
-    if request.user.role == 'viloyat':
+    """Hisobotda ko'rsatiladigan viloyatlar ro'yxati — viloyat/tuman rolidagi foydalanuvchi faqat o'zinikini ko'radi."""
+    if request.user.role in ('viloyat', 'tuman'):
         return list(Viloyat.objects.filter(id=request.user.viloyat_id).values('id', 'nomi').order_by('id'))
     vid = request.GET.get('viloyat')
     if vid:
@@ -2950,7 +2999,7 @@ def murojaat_hisobot(request):
     end   = request.GET.get('end',   date.today().isoformat())
     viloyatlar = _hisobot_viloyatlar(request)
     v_ids = [v['id'] for v in viloyatlar]
-    vf = get_viloyat_qs_filter(request, 'viloyat_id')
+    vf = get_viloyat_qs_filter(request, 'viloyat_id', tuman_prefix='tuman_id')
     rows = _build_hisobot_rows(start, end, v_ids, vf)
     zarar_jami = _zarar_jami(start, end, vf)
     return Response({'viloyatlar': viloyatlar, 'rows': rows, 'start': start, 'end': end, 'zarar_jami': zarar_jami})
@@ -2968,7 +3017,7 @@ def murojaat_statistika(request):
     usul    = request.GET.get('usul_id')
     yosh_min = request.GET.get('yosh_min')
     yosh_max = request.GET.get('yosh_max')
-    vf = get_viloyat_qs_filter(request, 'viloyat_id')
+    vf = get_viloyat_qs_filter(request, 'viloyat_id', tuman_prefix='tuman_id')
     qs = Murojaat.objects.filter(**vf)
     if start:
         qs = qs.filter(sana__gte=start)
@@ -3119,7 +3168,7 @@ def _kunlik_holati_data(request):
 
     viloyatlar = _hisobot_viloyatlar(request)
     v_ids = [v['id'] for v in viloyatlar]
-    vf = get_viloyat_qs_filter(request, 'viloyat_id')
+    vf = get_viloyat_qs_filter(request, 'viloyat_id', tuman_prefix='tuman_id')
 
     sanalar, data, takroriy, takroriy_kunlik, start, end, kesildimi = _compute_kunlik_holati(start, end, v_ids, vf, 'viloyat_id')
 
@@ -3327,7 +3376,7 @@ def _hisobot_tumanlar(request):
     markaziy/respublika uchun ?viloyat= query param orqali tanlanadi.
     Ixtiyoriy ?tuman= bo'lsa faqat o'sha bitta tuman qaytariladi (aniq filtr).
     """
-    if request.user.role == 'viloyat':
+    if request.user.role in ('viloyat', 'tuman'):
         viloyat_id = request.user.viloyat_id
     else:
         vid = request.GET.get('viloyat')
@@ -3336,6 +3385,9 @@ def _hisobot_tumanlar(request):
     qs = Tuman.objects.all()
     if viloyat_id:
         qs = qs.filter(viloyat_id=viloyat_id)
+
+    if request.user.role == 'tuman':
+        qs = qs.filter(id=request.user.tuman_id)
 
     tuman_id = request.GET.get('tuman')
     if tuman_id:
@@ -3504,7 +3556,7 @@ def murojaat_hisobot_excel(request):
 
     viloyatlar = _hisobot_viloyatlar(request)
     v_ids = [v['id'] for v in viloyatlar]
-    vf = get_viloyat_qs_filter(request, 'viloyat_id')
+    vf = get_viloyat_qs_filter(request, 'viloyat_id', tuman_prefix='tuman_id')
     rows  = _build_hisobot_rows(start, end, v_ids, vf)
 
     wb = _build_hisobot_workbook('KIBERJINOYAT MUROJAATLARI HISOBOTI', viloyatlar, rows, start, end)
@@ -3578,25 +3630,26 @@ def murojaat_hisobot_tuman_excel(request):
 #  KUNLIK ISHLAR
 # ════════════════════════════════════════════════════════════════════
 
-def _bot_agg(viloyat_id, sana_str, end_str=None):
-    """Bot hisobotlaridan shu viloyat + sana (yoki sana oralig'i) uchun agregatsiya."""
+def _bot_agg(viloyat_id, sana_str, end_str=None, tuman_id=None):
+    """Bot hisobotlaridan shu viloyat (yoki tuman) + sana (yoki sana oralig'i) uchun agregatsiya."""
     from django.db.models import Sum, Count, Q
     sana = date.fromisoformat(sana_str)
+    hudud_filter = {'mahalla__tuman_id': tuman_id} if tuman_id else {'mahalla__tuman__viloyat_id': viloyat_id}
 
     if end_str:
         oraliq = date.fromisoformat(end_str)
         qs = Hisobot.objects.filter(
             status=2,
-            mahalla__tuman__viloyat_id=viloyat_id,
             qushilgan_vaqt__date__range=[sana, oraliq],
             targibot_turi__in=[1, 2],
+            **hudud_filter,
         )
     else:
         qs = Hisobot.objects.filter(
             status=2,
-            mahalla__tuman__viloyat_id=viloyat_id,
             qushilgan_vaqt__date=sana,
             targibot_turi__in=[1, 2],
+            **hudud_filter,
         )
 
     # kategoriya bo'yicha hisobotlar soni (bir kunda)
@@ -3645,7 +3698,11 @@ def kunlik_ishlar_get(request):
     """GET /api/kunlik-ishlar/?viloyat=&sana="""
     role = request.user.role
 
-    if role == 'viloyat':
+    tuman_id = None
+    if role == 'tuman':
+        viloyat_id = request.user.viloyat_id
+        tuman_id   = request.user.tuman_id
+    elif role == 'viloyat':
         viloyat_id = request.user.viloyat_id
     else:
         viloyat_id = request.GET.get('viloyat')
@@ -3655,9 +3712,9 @@ def kunlik_ishlar_get(request):
         return Response({'error': 'viloyat kerak'}, status=400)
 
     record, _ = KunlikIshlar.objects.get_or_create(
-        viloyat_id=viloyat_id, sana=sana
+        viloyat_id=viloyat_id, tuman_id=tuman_id, sana=sana
     )
-    bot_data = _bot_agg(viloyat_id, sana)
+    bot_data = _bot_agg(viloyat_id, sana, tuman_id=tuman_id)
 
     kat_nomlar = {f'kat{k}': v for k, v in TargibotUtkazilganJoy.KATEGORIYA}
 
@@ -3673,13 +3730,20 @@ def kunlik_ishlar_get(request):
 def kunlik_ishlar_save(request):
     """POST /api/kunlik-ishlar/saqlash/ — viloyat saqlaydi/yuboradi"""
     role = request.user.role
-    if role not in ('viloyat', 'respublika'):
+    if role not in ('viloyat', 'respublika', 'tuman'):
         return Response({'error': 'Ruxsat yo\'q'}, status=403)
 
-    viloyat_id = request.user.viloyat_id if role == 'viloyat' else request.data.get('viloyat')
+    tuman_id = None
+    if role == 'tuman':
+        viloyat_id = request.user.viloyat_id
+        tuman_id   = request.user.tuman_id
+    elif role == 'viloyat':
+        viloyat_id = request.user.viloyat_id
+    else:
+        viloyat_id = request.data.get('viloyat')
     sana       = request.data.get('sana', date.today().isoformat())
 
-    record, _ = KunlikIshlar.objects.get_or_create(viloyat_id=viloyat_id, sana=sana)
+    record, _ = KunlikIshlar.objects.get_or_create(viloyat_id=viloyat_id, tuman_id=tuman_id, sana=sana)
 
     if record.status == 3:
         return Response({'error': 'Tasdiqlangan hisobot o\'zgartirib bo\'lmaydi'}, status=400)
@@ -3733,8 +3797,17 @@ def kunlik_ishlar_list(request):
     sana = request.GET.get('sana', date.today().isoformat())
     role = request.user.role
 
+    if role == 'tuman':
+        qs = KunlikIshlar.objects.filter(tuman_id=request.user.tuman_id, sana=sana)
+        result = []
+        for rec in qs:
+            d = KunlikIshlarSerializer(rec).data
+            d['bot'] = _bot_agg(rec.viloyat_id, sana, tuman_id=rec.tuman_id)
+            result.append(d)
+        return Response(result)
+
     if role == 'viloyat':
-        qs = KunlikIshlar.objects.filter(viloyat_id=request.user.viloyat_id, sana=sana)
+        qs = KunlikIshlar.objects.filter(viloyat_id=request.user.viloyat_id, tuman__isnull=True, sana=sana)
         result = []
         for rec in qs:
             d = KunlikIshlarSerializer(rec).data
@@ -3778,7 +3851,11 @@ def kunlik_ishlar_oraliq(request):
     end   = request.GET.get('end',   date.today().isoformat())
     role  = request.user.role
 
-    if role == 'viloyat':
+    tuman_id = None
+    if role == 'tuman':
+        viloyat_id = request.user.viloyat_id
+        tuman_id   = request.user.tuman_id
+    elif role == 'viloyat':
         viloyat_id = request.user.viloyat_id
     else:
         viloyat_id = request.GET.get('viloyat')
@@ -3786,7 +3863,7 @@ def kunlik_ishlar_oraliq(request):
         return Response({'error': 'viloyat kerak'}, status=400)
 
     viloyat = Viloyat.objects.get(id=viloyat_id)
-    qs = KunlikIshlar.objects.filter(viloyat_id=viloyat_id, sana__range=[start, end])
+    qs = KunlikIshlar.objects.filter(viloyat_id=viloyat_id, tuman_id=tuman_id, sana__range=[start, end])
 
     agg = qs.aggregate(
         oav_tv_soni            = Sum('oav_tv_soni'),
@@ -3816,7 +3893,7 @@ def kunlik_ishlar_oraliq(request):
         'end'          : end,
         'kun_soni'     : qs.count(),
         **agg,
-        'bot'          : _bot_agg(viloyat_id, start, end),
+        'bot'          : _bot_agg(viloyat_id, start, end, tuman_id=tuman_id),
         'kat_nomlar'   : kat_nomlar,
     })
 

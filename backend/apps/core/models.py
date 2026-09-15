@@ -3,6 +3,7 @@ from django.db import models
 # ── Viloyat ──────────────────────────────────────────────────────────────────
 class Viloyat(models.Model):
     nomi = models.CharField(max_length=255)
+    faqat_shahar_tumani = models.BooleanField(default=False)  # Toshkent shahar uchun — tuman-admin yaratish shu viloyatda ochiladi
     class Meta:
         db_table = 'viloyat'
     def __str__(self):
@@ -216,6 +217,7 @@ class KunlikIshlar(models.Model):
     ]
 
     viloyat    = models.ForeignKey(Viloyat, on_delete=models.CASCADE, db_column='viloyat_id')
+    tuman      = models.ForeignKey(Tuman, on_delete=models.CASCADE, db_column='tuman_id', null=True, blank=True)
     sana       = models.DateField()
     status     = models.IntegerField(default=1, choices=STATUS)
     rad_sababi = models.TextField(blank=True, default='')
@@ -271,7 +273,7 @@ class KunlikIshlar(models.Model):
 
     class Meta:
         db_table         = 'kunlik_ishlar'
-        unique_together  = ('viloyat', 'sana')
+        unique_together  = ('viloyat', 'tuman', 'sana')
         ordering         = ['-sana']
 
     def __str__(self):

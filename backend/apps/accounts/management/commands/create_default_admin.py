@@ -28,7 +28,7 @@ class Command(BaseCommand):
             ))
         else:
             # Mavjud admin'ni respublika rolga yangilash (eski 'admin' roldan)
-            if user.role not in ('respublika', 'viloyat'):
+            if user.role not in ('respublika', 'viloyat', 'tuman'):
                 user.role = 'respublika'
                 user.save(update_fields=['role'])
                 self.stdout.write(self.style.SUCCESS('✅ Admin roli respublikaga yangilandi'))

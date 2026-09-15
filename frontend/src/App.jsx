@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import Layout from './layouts/Layout'
 import RespublikaLayout from './layouts/RespublikaLayout'
+import TumanLayout from './layouts/TumanLayout'
 
 // Viloyat admin sahifalari
 import Login from './pages/Login'
@@ -43,8 +44,9 @@ const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token')
   const role  = localStorage.getItem('role')
   if (!token) return <Navigate to="/login" replace/>
-  // Respublika admin viloyat paneliga kira olmasin
+  // Respublika/tuman admin viloyat paneliga kira olmasin
   if (role === 'respublika') return <Navigate to="/respublika" replace/>
+  if (role === 'tuman') return <Navigate to="/tuman" replace/>
   return children
 }
 
@@ -53,6 +55,14 @@ const RespublikaRoute = ({ children }) => {
   const role  = localStorage.getItem('role')
   if (!token) return <Navigate to="/login" replace/>
   if (role !== 'respublika') return <Navigate to="/" replace/>
+  return children
+}
+
+const TumanRoute = ({ children }) => {
+  const token = localStorage.getItem('token')
+  const role  = localStorage.getItem('role')
+  if (!token) return <Navigate to="/login" replace/>
+  if (role !== 'tuman') return <Navigate to="/" replace/>
   return children
 }
 
@@ -109,6 +119,24 @@ export default function App() {
           <Route path="viloyatlar"       element={<Viloyatlar/>}/>
           <Route path="foydalanuvchilar"    element={<Foydalanuvchilar/>}/>
           <Route path="hamkor-tashkilotlar" element={<HamkorTashkilotlar/>}/>
+        </Route>
+
+        {/* ── Tuman admin paneli (faqat Toshkent shahar) ────────────────── */}
+        <Route path="/tuman" element={<TumanRoute><TumanLayout/></TumanRoute>}>
+          <Route index                                        element={<Dashboard/>}/>
+          <Route path="yangi-targibotlar"                    element={<YangiTargibotlar/>}/>
+          <Route path="tasdiqlangan-targibotlar"             element={<TasdiqlanganTargibotlar/>}/>
+          <Route path="rad-qilingan-targibotlar"             element={<RadQilinganTargibotlar/>}/>
+          <Route path="kunlik-ishlar"                        element={<KunlikIshlar/>}/>
+          <Route path="hisobot"                              element={<Hisobot/>}/>
+          <Route path="hisobot-kunlik"                       element={<HisobotKunlik/>}/>
+          <Route path="hisobot-kunlik-ishlar"                  element={<KunlikIshlarHisobot/>}/>
+          <Route path="murojaat"                              element={<Murojaat/>}/>
+          <Route path="murojaat-statistika"                  element={<MurojaatStatistika/>}/>
+          <Route path="murojaat-hisobot"                     element={<MurojaatHisobotTuman/>}/>
+          <Route path="mahallalar"                           element={<Mahallalar/>}/>
+          <Route path="kunlik-malumotnoma"                   element={<KunlikMalumotnoma/>}/>
+          <Route path="qamrov"                               element={<Qamrov/>}/>
         </Route>
 
         <Route path="*" element={<Navigate to="/login" replace/>}/>

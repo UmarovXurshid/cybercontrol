@@ -11,9 +11,9 @@ class IsRespublika(BasePermission):
 
 
 class IsViloyatOrAbove(BasePermission):
-    """Viloyat admin yoki respublika admin."""
+    """Viloyat, tuman yoki respublika admin."""
     def has_permission(self, request, view):
         return bool(
             request.user and request.user.is_authenticated
-            and request.user.role in ('respublika', 'viloyat')
+            and request.user.role in ('respublika', 'viloyat', 'tuman')
         )

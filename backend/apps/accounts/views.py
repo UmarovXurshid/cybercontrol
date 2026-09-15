@@ -14,4 +14,6 @@ def me(request):
         'fish':         u.fish,
         'viloyat_id':   u.viloyat_id,
         'viloyat_nomi': u.viloyat.nomi if u.viloyat else None,
+        'tuman_id':     u.tuman_id,
+        'tuman_nomi':   u.tuman.tuman_nomi if u.tuman else None,
     })

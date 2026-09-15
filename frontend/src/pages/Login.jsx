@@ -33,13 +33,16 @@ export default function Login() {
       const { data } = await axios.post('/api/token/', form)
       localStorage.setItem('token', data.access)
 
-      // JWT payload'dan role va viloyat_id olish
+      // JWT payload'dan role, viloyat_id va tuman_id olish
       const payload = JSON.parse(atob(data.access.split('.')[1]))
       localStorage.setItem('role', payload.role || '')
       localStorage.setItem('viloyat_id', payload.viloyat_id != null ? String(payload.viloyat_id) : '')
+      localStorage.setItem('tuman_id', payload.tuman_id != null ? String(payload.tuman_id) : '')
 
       if (payload.role === 'respublika') {
         nav('/respublika')
+      } else if (payload.role === 'tuman') {
+        nav('/tuman')
       } else {
         nav('/')
       }

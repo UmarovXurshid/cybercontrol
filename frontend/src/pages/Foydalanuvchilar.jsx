@@ -3,22 +3,29 @@ import api from '../api'
 import toast from 'react-hot-toast'
 import { PencilIcon, TrashIcon, PlusIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
 
-const emptyForm = { username: '', fish: '', role: 'viloyat', viloyat: '', parol: '', is_active: true }
+const emptyForm = { username: '', fish: '', role: 'viloyat', viloyat: '', tuman: '', parol: '', is_active: true }
 
 export default function Foydalanuvchilar() {
   const [list, setList]       = useState([])
   const [viloyatlar, setViloyatlar] = useState([])
+  const [shaharTumanlar, setShaharTumanlar] = useState([])
   const [modal, setModal]     = useState(false)
   const [form, setForm]       = useState(emptyForm)
   const [editId, setEditId]   = useState(null)
   const [loading, setLoading] = useState(false)
   const [showPass, setShowPass] = useState(false)
 
+  const shaharViloyat = viloyatlar.find(v => v.faqat_shahar_tumani)
+
   const load = () => {
     api.get('/foydalanuvchilar/').then(r => setList(r.data))
     api.get('/viloyatlar/').then(r => setViloyatlar(r.data))
   }
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (shaharViloyat) api.get(`/tumanlar/?viloyat=${shaharViloyat.id}`).then(r => setShaharTumanlar(r.data.results || r.data))
+  }, [shaharViloyat?.id])
 
   const openAdd  = ()    => { setForm(emptyForm); setEditId(null); setShowPass(false); setModal(true) }
   const openEdit = item  => {
@@ -27,6 +34,7 @@ export default function Foydalanuvchilar() {
       fish:     item.fish || '',
       role:     item.role,
       viloyat:  item.viloyat || '',
+      tuman:    item.tuman || '',
       parol:    '',
       is_active: item.is_active,
     })
@@ -40,10 +48,14 @@ export default function Foydalanuvchilar() {
     e.preventDefault()
     if (!form.username.trim()) return toast.error("Login bo'sh bo'lmasin")
     if (!editId && !form.parol.trim()) return toast.error("Yangi foydalanuvchi uchun parol kerak")
+    if (form.role === 'tuman' && !form.tuman) return toast.error("Tuman tanlanmagan")
     setLoading(true)
     try {
       const payload = { ...form }
+      if (form.role === 'tuman') delete payload.viloyat   // server tuman orqali avtomatik biriktiradi
+      else delete payload.tuman
       if (!payload.viloyat) delete payload.viloyat
+      if (!payload.tuman)   delete payload.tuman
       if (!payload.parol)   delete payload.parol
       if (editId) {
         await api.put(`/foydalanuvchilar/${editId}/`, payload)
@@ -70,6 +82,8 @@ export default function Foydalanuvchilar() {
 
   const roleBadge = role => role === 'respublika'
     ? <span className="badge-blue">Respublika</span>
+    : role === 'tuman'
+    ? <span className="badge-green">Tuman</span>
     : <span className="badge-green">Viloyat</span>
 
   return (
@@ -99,6 +113,7 @@ export default function Foydalanuvchilar() {
                 <th className="px-4 py-3 text-left">FIO</th>
                 <th className="px-4 py-3 text-left">Rol</th>
                 <th className="px-4 py-3 text-left">Viloyat</th>
+                <th className="px-4 py-3 text-left">Tuman</th>
                 <th className="px-4 py-3 text-left">Holat</th>
                 <th className="px-4 py-3 text-right">Amallar</th>
               </tr>
@@ -111,6 +126,7 @@ export default function Foydalanuvchilar() {
                   <td className="px-4 py-3 text-gray-600">{u.fish || '—'}</td>
                   <td className="px-4 py-3">{roleBadge(u.role)}</td>
                   <td className="px-4 py-3 text-gray-500">{u.viloyat_nomi || '—'}</td>
+                  <td className="px-4 py-3 text-gray-500">{u.tuman_nomi || '—'}</td>
                   <td className="px-4 py-3">
                     {u.is_active
                       ? <span className="text-green-600 text-xs font-medium">Faol</span>
@@ -167,9 +183,10 @@ export default function Foydalanuvchilar() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
                 <select className="input-field" value={form.role}
-                  onChange={e => setForm({ ...form, role: e.target.value })}>
+                  onChange={e => setForm({ ...form, role: e.target.value, viloyat: '', tuman: '' })}>
                   <option value="viloyat">Viloyat admin</option>
                   <option value="respublika">Respublika admin</option>
+                  {shaharViloyat && <option value="tuman">Tuman admin ({shaharViloyat.nomi})</option>}
                 </select>
               </div>
               {form.role === 'viloyat' && (
@@ -180,6 +197,18 @@ export default function Foydalanuvchilar() {
                     <option value="">— Tanlang —</option>
                     {viloyatlar.map(v => (
                       <option key={v.id} value={v.id}>{v.nomi}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {form.role === 'tuman' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tuman ({shaharViloyat?.nomi})</label>
+                  <select className="input-field" value={form.tuman}
+                    onChange={e => setForm({ ...form, tuman: e.target.value })}>
+                    <option value="">— Tanlang —</option>
+                    {shaharTumanlar.map(t => (
+                      <option key={t.id} value={t.id}>{t.tuman_nomi}</option>
                     ))}
                   </select>
                 </div>

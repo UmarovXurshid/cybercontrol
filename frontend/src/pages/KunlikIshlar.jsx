@@ -383,7 +383,8 @@ export default function KunlikIshlar() {
   const [detailViloyat, setDetailViloyat] = useState(null)
 
   const myRole      = role()
-  const isViloyat    = myRole === 'viloyat'
+  const isTuman      = myRole === 'tuman'
+  const isViloyat    = myRole === 'viloyat' || isTuman
   const isRespublika = myRole === 'respublika'
   const isLocked     = record?.status === 3
 

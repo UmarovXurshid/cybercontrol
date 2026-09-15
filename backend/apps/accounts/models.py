@@ -18,6 +18,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     ROLE_CHOICES = [
         ('respublika', 'Respublika Admin'),
         ('viloyat',    'Viloyat Admin'),
+        ('tuman',      'Tuman Admin'),
     ]
     fish       = models.CharField(max_length=255, blank=True)
     username   = models.CharField(max_length=150, unique=True)
@@ -25,6 +26,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     viloyat    = models.ForeignKey(
         'core.Viloyat', null=True, blank=True,
         on_delete=models.SET_NULL, db_column='viloyat_id'
+    )
+    tuman      = models.ForeignKey(
+        'core.Tuman', null=True, blank=True,
+        on_delete=models.SET_NULL, db_column='tuman_id'
     )
     is_active  = models.BooleanField(default=True)
     is_staff   = models.BooleanField(default=False)
