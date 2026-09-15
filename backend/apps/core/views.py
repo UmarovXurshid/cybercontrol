@@ -23,7 +23,7 @@ from .serializers import (ViloyatSerializer, TumanSerializer, MahallaSerializer,
                           HisobotSerializer, TargibotJoySerializer, InspektorSerializer,
                           MurojaatUsulSerializer, MurojaatKasbSerializer, MurojaatSerializer,
                           KunlikIshlarSerializer, HamkorTashkilotSerializer, HamkorXodimSerializer)
-from .permissions import IsRespublika, IsViloyatOrAbove
+from .permissions import IsRespublika, IsViloyatOrAbove, IsRespublikaOrShaharAdmin
 from apps.accounts.models import User
 from apps.accounts.serializers import FoydalanuvchiSerializer
 
@@ -1060,13 +1060,28 @@ def _tuman_admin_ruxsat_etilganmi(tuman):
 
 
 class FoydalanuvchiViewSet(viewsets.ModelViewSet):
-    queryset            = User.objects.all().order_by('id')
     serializer_class    = FoydalanuvchiSerializer
-    permission_classes  = [IsAuthenticated, IsRespublika]
+    permission_classes  = [IsAuthenticated, IsRespublikaOrShaharAdmin]
+
+    def get_queryset(self):
+        u = self.request.user
+        qs = User.objects.all().order_by('id')
+        if u.role == 'viloyat':
+            # Shahar (Toshkent) admin — faqat o'z shahridagi tuman adminlarini ko'radi/boshqaradi
+            return qs.filter(role='tuman', tuman__viloyat_id=u.viloyat_id)
+        return qs
 
     def perform_create(self, serializer):
+        u = self.request.user
         extra = {}
-        if serializer.validated_data.get('role') == 'tuman':
+        if u.role == 'viloyat':
+            if serializer.validated_data.get('role') != 'tuman':
+                raise ValidationError({'role': "Faqat tuman admin yaratishingiz mumkin"})
+            tuman = serializer.validated_data.get('tuman')
+            if not tuman or tuman.viloyat_id != u.viloyat_id:
+                raise ValidationError({'tuman': "Faqat o'z shahringiz tumanlari uchun yaratishingiz mumkin"})
+            extra['viloyat_id'] = tuman.viloyat_id
+        elif serializer.validated_data.get('role') == 'tuman':
             tuman = serializer.validated_data.get('tuman')
             if not _tuman_admin_ruxsat_etilganmi(tuman):
                 raise ValidationError({'tuman': "Tuman admin faqat Toshkent shahar tumanlari uchun yaratiladi"})
@@ -1078,9 +1093,17 @@ class FoydalanuvchiViewSet(viewsets.ModelViewSet):
             user.save()
 
     def perform_update(self, serializer):
+        u = self.request.user
         role = serializer.validated_data.get('role', serializer.instance.role)
         extra = {}
-        if role == 'tuman':
+        if u.role == 'viloyat':
+            if role != 'tuman':
+                raise ValidationError({'role': "Faqat tuman admin tahrirlashingiz mumkin"})
+            tuman = serializer.validated_data.get('tuman', serializer.instance.tuman)
+            if not tuman or tuman.viloyat_id != u.viloyat_id:
+                raise ValidationError({'tuman': "Faqat o'z shahringiz tumanlari uchun"})
+            extra['viloyat_id'] = tuman.viloyat_id
+        elif role == 'tuman':
             tuman = serializer.validated_data.get('tuman', serializer.instance.tuman)
             if not _tuman_admin_ruxsat_etilganmi(tuman):
                 raise ValidationError({'tuman': "Tuman admin faqat Toshkent shahar tumanlari uchun yaratiladi"})

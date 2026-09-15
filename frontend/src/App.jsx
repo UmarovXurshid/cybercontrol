@@ -98,6 +98,7 @@ export default function App() {
           <Route path="qamrov"                               element={<Qamrov/>}/>
           <Route path="hamkor-tashkilotlar"                  element={<HamkorTashkilotlar/>}/>
           <Route path="audit-log"                            element={<AuditLog/>}/>
+          <Route path="foydalanuvchilar"                      element={<Foydalanuvchilar/>}/>
         </Route>
 
         {/* ── Respublika admin paneli ─────────────────────────────────── */}

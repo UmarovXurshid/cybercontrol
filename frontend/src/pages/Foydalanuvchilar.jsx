@@ -3,31 +3,47 @@ import api from '../api'
 import toast from 'react-hot-toast'
 import { PencilIcon, TrashIcon, PlusIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
 
-const emptyForm = { username: '', fish: '', role: 'viloyat', viloyat: '', tuman: '', parol: '', is_active: true }
+const myRole = () => localStorage.getItem('role')
+
+// Respublika: to'liq forma (rol tanlash). Shahar (Toshkent) viloyat admini:
+// faqat o'z tumanlari uchun tuman-admin yaratadi, rol har doim 'tuman'.
+const emptyFormFor = role => ({
+  username: '', fish: '', role: role === 'viloyat' ? 'tuman' : 'viloyat',
+  viloyat: '', tuman: '', parol: '', is_active: true,
+})
 
 export default function Foydalanuvchilar() {
+  const isShaharAdmin = myRole() === 'viloyat'
   const [list, setList]       = useState([])
   const [viloyatlar, setViloyatlar] = useState([])
+  const [shaharViloyatNomi, setShaharViloyatNomi] = useState('')
   const [shaharTumanlar, setShaharTumanlar] = useState([])
   const [modal, setModal]     = useState(false)
-  const [form, setForm]       = useState(emptyForm)
+  const [form, setForm]       = useState(() => emptyFormFor(myRole()))
   const [editId, setEditId]   = useState(null)
   const [loading, setLoading] = useState(false)
   const [showPass, setShowPass] = useState(false)
 
-  const shaharViloyat = viloyatlar.find(v => v.faqat_shahar_tumani)
+  // Respublika uchun — viloyatlar ro'yxatidan Toshkent shaharni topamiz
+  const shaharViloyat = isShaharAdmin ? null : viloyatlar.find(v => v.faqat_shahar_tumani)
+  const shaharNomi    = isShaharAdmin ? shaharViloyatNomi : shaharViloyat?.nomi
 
   const load = () => {
     api.get('/foydalanuvchilar/').then(r => setList(r.data))
-    api.get('/viloyatlar/').then(r => setViloyatlar(r.data))
+    if (isShaharAdmin) {
+      api.get('/auth/me/').then(r => setShaharViloyatNomi(r.data.viloyat_nomi || ''))
+      api.get('/tumanlar/').then(r => setShaharTumanlar(r.data.results || r.data))
+    } else {
+      api.get('/viloyatlar/').then(r => setViloyatlar(r.data))
+    }
   }
   useEffect(() => { load() }, [])
 
   useEffect(() => {
-    if (shaharViloyat) api.get(`/tumanlar/?viloyat=${shaharViloyat.id}`).then(r => setShaharTumanlar(r.data.results || r.data))
+    if (!isShaharAdmin && shaharViloyat) api.get(`/tumanlar/?viloyat=${shaharViloyat.id}`).then(r => setShaharTumanlar(r.data.results || r.data))
   }, [shaharViloyat?.id])
 
-  const openAdd  = ()    => { setForm(emptyForm); setEditId(null); setShowPass(false); setModal(true) }
+  const openAdd  = ()    => { setForm(emptyFormFor(myRole())); setEditId(null); setShowPass(false); setModal(true) }
   const openEdit = item  => {
     setForm({
       username: item.username,
@@ -90,7 +106,7 @@ export default function Foydalanuvchilar() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">
-          Foydalanuvchilar
+          {isShaharAdmin ? 'Tuman adminlari' : 'Foydalanuvchilar'}
           <span className="ml-2 text-base font-normal text-gray-400">({list.length})</span>
         </h1>
         <button onClick={openAdd} className="btn-primary flex items-center gap-2">
@@ -180,16 +196,18 @@ export default function Foydalanuvchilar() {
                   </button>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
-                <select className="input-field" value={form.role}
-                  onChange={e => setForm({ ...form, role: e.target.value, viloyat: '', tuman: '' })}>
-                  <option value="viloyat">Viloyat admin</option>
-                  <option value="respublika">Respublika admin</option>
-                  {shaharViloyat && <option value="tuman">Tuman admin ({shaharViloyat.nomi})</option>}
-                </select>
-              </div>
-              {form.role === 'viloyat' && (
+              {!isShaharAdmin && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+                  <select className="input-field" value={form.role}
+                    onChange={e => setForm({ ...form, role: e.target.value, viloyat: '', tuman: '' })}>
+                    <option value="viloyat">Viloyat admin</option>
+                    <option value="respublika">Respublika admin</option>
+                    {shaharViloyat && <option value="tuman">Tuman admin ({shaharViloyat.nomi})</option>}
+                  </select>
+                </div>
+              )}
+              {!isShaharAdmin && form.role === 'viloyat' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Viloyat</label>
                   <select className="input-field" value={form.viloyat}
@@ -201,9 +219,9 @@ export default function Foydalanuvchilar() {
                   </select>
                 </div>
               )}
-              {form.role === 'tuman' && (
+              {(isShaharAdmin || form.role === 'tuman') && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tuman ({shaharViloyat?.nomi})</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tuman{shaharNomi ? ` (${shaharNomi})` : ''}</label>
                   <select className="input-field" value={form.tuman}
                     onChange={e => setForm({ ...form, tuman: e.target.value })}>
                     <option value="">— Tanlang —</option>

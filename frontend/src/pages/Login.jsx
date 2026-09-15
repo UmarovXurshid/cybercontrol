@@ -38,6 +38,7 @@ export default function Login() {
       localStorage.setItem('role', payload.role || '')
       localStorage.setItem('viloyat_id', payload.viloyat_id != null ? String(payload.viloyat_id) : '')
       localStorage.setItem('tuman_id', payload.tuman_id != null ? String(payload.tuman_id) : '')
+      localStorage.setItem('shahar_admin', payload.shahar_admin ? '1' : '')
 
       if (payload.role === 'respublika') {
         nav('/respublika')

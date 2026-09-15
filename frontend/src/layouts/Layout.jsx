@@ -7,7 +7,7 @@ import {
   ClipboardDocumentListIcon, MapPinIcon, MapIcon, ShieldExclamationIcon,
   ClipboardDocumentCheckIcon, BuildingStorefrontIcon, ChevronDownIcon,
   MegaphoneIcon as TargibotIcon, DocumentChartBarIcon as HisobotIcon,
-  BookOpenIcon
+  BookOpenIcon, UsersIcon
 } from '@heroicons/react/24/outline'
 
 // Standalone (guruhlanmagan) punktlar
@@ -74,11 +74,11 @@ const GROUPS = [
 
 const STORAGE_KEY = 'sidebar_open_groups'
 
-function loadOpenGroups(pathname) {
+function loadOpenGroups(pathname, groups) {
   let stored = {}
   try { stored = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {} } catch { stored = {} }
   // Joriy sahifa qaysi guruhga tegishli bo'lsa, o'sha guruh avtomatik ochiladi
-  const activeGroup = GROUPS.find(g => g.items.some(i => i.to === pathname))
+  const activeGroup = groups.find(g => g.items.some(i => i.to === pathname))
   if (activeGroup && !(activeGroup.key in stored)) stored[activeGroup.key] = true
   return stored
 }
@@ -87,9 +87,17 @@ export default function Layout() {
   const nav  = useNavigate()
   const loc  = useLocation()
   const role = localStorage.getItem('role')
-  const viloyatNomi = localStorage.getItem('viloyat_nomi') || ''
+  const viloyatNomi  = localStorage.getItem('viloyat_nomi') || ''
+  const shaharAdmin  = localStorage.getItem('shahar_admin') === '1'
 
-  const [openGroups, setOpenGroups] = useState(() => loadOpenGroups(loc.pathname))
+  // Toshkent shahar viloyat admini — o'z tuman adminlarini boshqarishi uchun
+  const groups = shaharAdmin
+    ? GROUPS.map(g => g.key === 'boshqaruv'
+        ? { ...g, items: [{ to: '/foydalanuvchilar', icon: UsersIcon, label: 'Tuman adminlari' }, ...g.items] }
+        : g)
+    : GROUPS
+
+  const [openGroups, setOpenGroups] = useState(() => loadOpenGroups(loc.pathname, groups))
 
   const toggleGroup = (key) => {
     setOpenGroups(prev => {
@@ -104,6 +112,8 @@ export default function Layout() {
     localStorage.removeItem('role')
     localStorage.removeItem('viloyat_id')
     localStorage.removeItem('viloyat_nomi')
+    localStorage.removeItem('tuman_id')
+    localStorage.removeItem('shahar_admin')
     nav('/login')
   }
 
@@ -127,7 +137,7 @@ export default function Layout() {
             </NavLink>
           ))}
 
-          {GROUPS.map(({ key, label, icon: GroupIcon, items }) => {
+          {groups.map(({ key, label, icon: GroupIcon, items }) => {
             const isOpen       = !!openGroups[key]
             const hasActiveNow = items.some(i => i.to === loc.pathname)
             return (
