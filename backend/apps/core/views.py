@@ -4013,8 +4013,9 @@ def samaradorlik_hisobot(request):
         """
         params = [start, end] * 3
     else:
-        viloyat_id = request.user.viloyat_id
-        sql = """
+        hudud_where = "tuman.id=%s" if role == 'tuman' else "tuman.viloyat_id=%s"
+        hudud_id    = request.user.tuman_id if role == 'tuman' else request.user.viloyat_id
+        sql = f"""
             SELECT mahalla.mahalla_nomi AS nomi, tuman.tuman_nomi,
                    (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                     AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS targibot_soni,
@@ -4022,9 +4023,9 @@ def samaradorlik_hisobot(request):
                     AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS qatnashchilar,
                    (SELECT COUNT(*) FROM murojaat m WHERE m.mahalla_id=mahalla.id AND m.sana BETWEEN %s AND %s AND m.holat != 'takroriy') AS murojaat_soni
             FROM mahalla JOIN tuman ON mahalla.tuman_id=tuman.id
-            WHERE tuman.viloyat_id=%s ORDER BY tuman.id, mahalla.mahalla_nomi
+            WHERE {hudud_where} ORDER BY tuman.id, mahalla.mahalla_nomi
         """
-        params = [start, end] * 3 + [viloyat_id]
+        params = [start, end] * 3 + [hudud_id]
 
     with connection.cursor() as cur:
         cur.execute(sql, params)
@@ -4067,19 +4068,20 @@ def xavfli_mahallalar(request):
         """
         params = [start, end] * 2
     else:
-        viloyat_id = request.user.viloyat_id
-        sql = """
+        hudud_where = "tuman.id=%s" if role == 'tuman' else "tuman.viloyat_id=%s"
+        hudud_id    = request.user.tuman_id if role == 'tuman' else request.user.viloyat_id
+        sql = f"""
             SELECT mahalla.mahalla_nomi AS nomi, tuman.tuman_nomi,
                    (SELECT COUNT(*) FROM hisobot h WHERE h.mahalla_id=mahalla.id AND h.status=2
                     AND DATE(h.qushilgan_vaqt) BETWEEN %s AND %s) AS targibot_soni,
                    (SELECT COUNT(*) FROM murojaat m WHERE m.mahalla_id=mahalla.id AND m.sana BETWEEN %s AND %s AND m.holat != 'takroriy') AS murojaat_soni
             FROM mahalla JOIN tuman ON mahalla.tuman_id=tuman.id
-            WHERE tuman.viloyat_id=%s
+            WHERE {hudud_where}
             HAVING murojaat_soni > 0
             ORDER BY murojaat_soni DESC, targibot_soni ASC
             LIMIT 100
         """
-        params = [start, end] * 2 + [viloyat_id]
+        params = [start, end] * 2 + [hudud_id]
 
     with connection.cursor() as cur:
         cur.execute(sql, params)
@@ -4144,6 +4146,22 @@ def oylik_dinamika(request):
             """
             t_params = [int(yil)]
             m_params = [int(yil)]
+    elif role == 'tuman':
+        tid = request.user.tuman_id
+        targibot_sql = """
+            SELECT MONTH(h.qushilgan_vaqt) AS oy, COUNT(*) AS soni,
+                   COALESCE(SUM(h.qatnashchilar_soni),0) AS qatnashchilar
+            FROM hisobot h JOIN mahalla m ON h.mahalla_id=m.id
+            WHERE m.tuman_id=%s AND h.status=2 AND YEAR(h.qushilgan_vaqt)=%s
+            GROUP BY MONTH(h.qushilgan_vaqt)
+        """
+        murojaat_sql = """
+            SELECT MONTH(sana) AS oy, COUNT(*) AS soni
+            FROM murojaat WHERE tuman_id=%s AND YEAR(sana)=%s AND holat != 'takroriy'
+            GROUP BY MONTH(sana)
+        """
+        t_params = [tid, int(yil)]
+        m_params = [tid, int(yil)]
     else:
         vid = request.user.viloyat_id
         targibot_sql = """
@@ -4230,6 +4248,24 @@ def haftalik_holat(request):
             """
             t_params = []
             m_params = []
+    elif role == 'tuman':
+        tid = request.user.tuman_id
+        targibot_sql = """
+            SELECT YEARWEEK(h.qushilgan_vaqt, 1) AS hafta,
+                   MIN(DATE(h.qushilgan_vaqt)) AS hafta_boshlash,
+                   COUNT(*) AS soni,
+                   COALESCE(SUM(h.qatnashchilar_soni),0) AS qatnashchilar
+            FROM hisobot h JOIN mahalla m ON h.mahalla_id=m.id
+            WHERE m.tuman_id=%s AND h.status=2 AND h.qushilgan_vaqt >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
+            GROUP BY YEARWEEK(h.qushilgan_vaqt, 1) ORDER BY hafta DESC LIMIT 12
+        """
+        murojaat_sql = """
+            SELECT YEARWEEK(sana, 1) AS hafta, COUNT(*) AS soni
+            FROM murojaat WHERE tuman_id=%s AND sana >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK) AND holat != 'takroriy'
+            GROUP BY YEARWEEK(sana, 1)
+        """
+        t_params = [tid]
+        m_params = [tid]
     else:
         vid = request.user.viloyat_id
         targibot_sql = """
@@ -4318,6 +4354,8 @@ def hamkor_tashkilot_hisobot(request):
         """
         params = params + params + v_params
     else:
+        hudud_where = "ht.tuman_id = %s" if role == 'tuman' else "ht.viloyat_id = %s"
+        hudud_id    = request.user.tuman_id if role == 'tuman' else viloyat_id
         sql = f"""
             SELECT
                 ht.id   AS tashkilot_id,
@@ -4332,10 +4370,10 @@ def hamkor_tashkilot_hisobot(request):
                  WHERE h.hamkor_xodim_id IN (SELECT id FROM hamkor_xodim WHERE tashkilot_id = ht.id)
                  AND h.status = 2 {date_filter})                                 AS qatnashchilar
             FROM hamkor_tashkilot ht
-            WHERE ht.viloyat_id = %s
+            WHERE {hudud_where}
             ORDER BY targibot_soni DESC
         """
-        params = params + params + [viloyat_id]
+        params = params + params + [hudud_id]
 
     with connection.cursor() as cur:
         cur.execute(sql, params)
