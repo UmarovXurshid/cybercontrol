@@ -2724,6 +2724,29 @@ def murojaat_import(request):
                 eng_yaqin = t
         return eng_yaqin
 
+    def norm_mahalla(s):
+        """Mahalla nomini solishtirish uchun: norm() + 'MFY'/'mahalla(si)' so'zi va tire olib tashlanadi."""
+        s = norm(s).replace('-', ' ')
+        s = re.sub(r'\b(mfy|mahalla(si)?|maxalla(si)?)\b', '', s)
+        return re.sub(r'\s+', ' ', s).strip()
+
+    def mahalla_top(tuman_id, mahalla_nomi_raw):
+        """Berilgan tuman ichida nomi bo'yicha (moslashuvchan) mahallani topadi.
+        Qaytaradi: (topilgan_mahalla_yoki_None, noaniq_nomzodlar_royxati)."""
+        target = norm_mahalla(mahalla_nomi_raw)
+        if not target:
+            return None, []
+        nomzodlar = []
+        for m in Mahalla.objects.filter(tuman_id=tuman_id):
+            cand = norm_mahalla(m.mahalla_nomi)
+            if cand == target:
+                return m, []
+            if cand and (cand in target or target in cand):
+                nomzodlar.append(m)
+        if len(nomzodlar) == 1:
+            return nomzodlar[0], []
+        return None, nomzodlar
+
     # Shablondagi dropdown nomlari (murojaat_shablon dagi jinsi/holat/tarmoq_pairs bilan bir xil),
     # to'liq matn yozilsa ham (masalan "Takroriy murojaat") to'g'ri tanish uchun.
     JINSI_MAP = {norm('Erkak'): 'erkak', norm('Ayol'): 'ayol'}
@@ -2811,12 +2834,9 @@ def murojaat_import(request):
             mahalla = None
             m_nomi = str(mahalla_nomi or '').strip()
             if m_nomi:
-                mahalla = Mahalla.objects.filter(tuman_id=tuman.id, mahalla_nomi__iexact=m_nomi).first()
+                mahalla, nomzodlar = mahalla_top(tuman.id, m_nomi)
                 if not mahalla:
-                    nomzodlar = list(Mahalla.objects.filter(tuman_id=tuman.id, mahalla_nomi__icontains=m_nomi))
-                    if len(nomzodlar) == 1:
-                        mahalla = nomzodlar[0]
-                    elif len(nomzodlar) > 1:
+                    if len(nomzodlar) > 1:
                         errors.append({'qator': idx, 'sabab': f"Mahalla noaniq (bir nechta mos keldi): {mahalla_nomi}", 'row': row})
                         continue
                     else:
