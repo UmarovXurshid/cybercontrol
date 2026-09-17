@@ -2655,7 +2655,7 @@ def murojaat_import(request):
         return Response({'error': 'Excel fayl yuklanmadi'}, status=400)
 
     role = request.user.role
-    if role not in ('viloyat', 'respublika'):
+    if role not in ('viloyat', 'respublika', 'tuman'):
         return Response({'error': 'Ruxsat yo\'q'}, status=403)
 
     try:
