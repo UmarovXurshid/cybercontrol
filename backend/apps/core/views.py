@@ -2703,6 +2703,27 @@ def murojaat_import(request):
         s = re.sub(r'\s+', ' ', s).strip()
         return s
 
+    def norm_tuman(s):
+        """Tuman nomini solishtirish uchun: norm() + 'tuman(i)'/'shahar/shahri' so'zi olib tashlanadi
+        (baza "Chiroqchi" deb, fayl esa "Chiroqchi tumani" deb yozgan bo'lishi mumkin)."""
+        s = norm(s)
+        s = re.sub(r'\b(tuman(i)?|shahar|shahri|viloyati?)\b', '', s)
+        return re.sub(r'\s+', ' ', s).strip()
+
+    def tuman_top(viloyat_id, tuman_nomi_raw):
+        """Berilgan viloyat ichida nomi bo'yicha (moslashuvchan) tumanni topadi."""
+        target = norm_tuman(tuman_nomi_raw)
+        if not target:
+            return None
+        eng_yaqin = None
+        for t in Tuman.objects.filter(viloyat_id=viloyat_id):
+            cand = norm_tuman(t.tuman_nomi)
+            if cand == target:
+                return t
+            if cand and (cand in target or target in cand) and eng_yaqin is None:
+                eng_yaqin = t
+        return eng_yaqin
+
     # Shablondagi dropdown nomlari (murojaat_shablon dagi jinsi/holat/tarmoq_pairs bilan bir xil),
     # to'liq matn yozilsa ham (masalan "Takroriy murojaat") to'g'ri tanish uchun.
     JINSI_MAP = {norm('Erkak'): 'erkak', norm('Ayol'): 'ayol'}
@@ -2782,9 +2803,7 @@ def murojaat_import(request):
                         continue
                     viloyat_id = vil.id
 
-                tuman = Tuman.objects.filter(
-                    viloyat_id=viloyat_id, tuman_nomi__icontains=str(tuman_nomi or '').strip()
-                ).first()
+                tuman = tuman_top(viloyat_id, tuman_nomi)
             if not tuman:
                 errors.append({'qator': idx, 'sabab': f'Tuman topilmadi: {tuman_nomi}', 'row': row})
                 continue
