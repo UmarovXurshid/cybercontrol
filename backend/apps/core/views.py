@@ -2711,26 +2711,50 @@ def murojaat_import(request):
         return re.sub(r'\s+', ' ', s).strip()
 
     def tuman_top(viloyat_id, tuman_nomi_raw):
-        """Berilgan viloyat ichida nomi bo'yicha (moslashuvchan) tumanni topadi."""
+        """Berilgan viloyat ichida nomi bo'yicha (moslashuvchan) tumanni topadi.
+        Ba'zi viloyatlarda bir xil nomli tuman va shahar alohida yozuvlar sifatida
+        saqlangan (masalan "Қарши  т." va "Қарши  ш.", "Шаҳрисабз т."/"Шаҳрисабз ш.") —
+        faylda "тумани" yoki "шахри/шахар" so'zi bo'lsa, shu turdagisi tanlanadi."""
+        raw = norm(tuman_nomi_raw)
+        hint_shahar = bool(re.search(r'\b(shahar|shahri)\b', raw))
+        hint_tuman  = (not hint_shahar) and bool(re.search(r'\btuman(i)?\b', raw))
+
+        def turi(t):
+            n = norm(t.tuman_nomi)
+            if re.search(r'(^|\s)sh\.?$', n):
+                return 'shahar'
+            if re.search(r'(^|\s)t\.?$', n):
+                return 'tuman'
+            return None
+
         target = norm_tuman(tuman_nomi_raw)
         if not target:
             return None
         target_ns = target.replace(' ', '')
-        eng_yaqin, eng_yaqin_ratio = None, 0
+        aniq, fuzzy_best, fuzzy_ratio = [], None, 0
         for t in Tuman.objects.filter(viloyat_id=viloyat_id):
             cand = norm_tuman(t.tuman_nomi)
             if not cand:
                 continue
-            if cand == target or cand.replace(' ', '') == target_ns:
-                return t
-            if cand in target or target in cand:
-                eng_yaqin, eng_yaqin_ratio = t, 1
+            if cand == target or cand.replace(' ', '') == target_ns or cand in target or target in cand:
+                aniq.append(t)
                 continue
             # Imlo farqi (masalan "ў"/"у") uchun taxminiy o'xshashlik
             ratio = SequenceMatcher(None, cand, target).ratio()
-            if ratio >= 0.84 and ratio > eng_yaqin_ratio:
-                eng_yaqin, eng_yaqin_ratio = t, ratio
-        return eng_yaqin
+            if ratio >= 0.84 and ratio > fuzzy_ratio:
+                fuzzy_best, fuzzy_ratio = t, ratio
+
+        if len(aniq) == 1:
+            return aniq[0]
+        if len(aniq) > 1:
+            if hint_shahar:
+                mos = [t for t in aniq if turi(t) == 'shahar']
+            elif hint_tuman:
+                mos = [t for t in aniq if turi(t) == 'tuman']
+            else:
+                mos = []
+            return mos[0] if len(mos) == 1 else aniq[0]
+        return fuzzy_best
 
     def norm_mahalla(s):
         """Mahalla nomini solishtirish uchun: norm() + 'MFY'/'mahalla(si)' so'zi va tire olib tashlanadi."""
