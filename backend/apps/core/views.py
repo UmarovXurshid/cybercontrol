@@ -2740,14 +2740,15 @@ def murojaat_import(request):
 
     def mahalla_top(tuman_id, mahalla_nomi_raw):
         """Berilgan tuman ichida nomi bo'yicha (moslashuvchan) mahallani topadi — avval aniq/qism mos
-        keladiganini, topilmasa esa imlo farqlariga (ў/у, bo'shliq bor/yo'q) chidamli eng yaqinini.
+        keladiganini, topilmasa esa imlo farqlariga (ў/у, bo'shliq bor/yo'q) chidamli eng yaqinini
+        (faqat ikkinchi eng yaqinidan sezilarli farq qilsa — aks holda noaniq deb qoldiriladi).
         Qaytaradi: (topilgan_mahalla_yoki_None, noaniq_nomzodlar_royxati)."""
         target = norm_mahalla(mahalla_nomi_raw)
         if not target:
             return None, []
         target_ns = target.replace(' ', '')
         aniq_nomzodlar = []
-        eng_yaqin, eng_yaqin_ratio = None, 0
+        eng_yaqin, eng_yaqin_ratio, ikkinchi_ratio = None, 0, 0
         for m in Mahalla.objects.filter(tuman_id=tuman_id):
             cand = norm_mahalla(m.mahalla_nomi)
             if not cand:
@@ -2758,13 +2759,15 @@ def murojaat_import(request):
                 aniq_nomzodlar.append(m)
                 continue
             ratio = SequenceMatcher(None, cand, target).ratio()
-            if ratio >= 0.86 and ratio > eng_yaqin_ratio:
-                eng_yaqin, eng_yaqin_ratio = m, ratio
+            if ratio > eng_yaqin_ratio:
+                eng_yaqin, eng_yaqin_ratio, ikkinchi_ratio = m, ratio, eng_yaqin_ratio
+            elif ratio > ikkinchi_ratio:
+                ikkinchi_ratio = ratio
         if len(aniq_nomzodlar) == 1:
             return aniq_nomzodlar[0], []
         if aniq_nomzodlar:
             return None, aniq_nomzodlar
-        if eng_yaqin:
+        if eng_yaqin and eng_yaqin_ratio >= 0.82 and eng_yaqin_ratio - ikkinchi_ratio >= 0.05:
             return eng_yaqin, []
         return None, []
 
