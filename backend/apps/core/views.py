@@ -2715,37 +2715,58 @@ def murojaat_import(request):
         target = norm_tuman(tuman_nomi_raw)
         if not target:
             return None
-        eng_yaqin = None
+        target_ns = target.replace(' ', '')
+        eng_yaqin, eng_yaqin_ratio = None, 0
         for t in Tuman.objects.filter(viloyat_id=viloyat_id):
             cand = norm_tuman(t.tuman_nomi)
-            if cand == target:
+            if not cand:
+                continue
+            if cand == target or cand.replace(' ', '') == target_ns:
                 return t
-            if cand and (cand in target or target in cand) and eng_yaqin is None:
-                eng_yaqin = t
+            if cand in target or target in cand:
+                eng_yaqin, eng_yaqin_ratio = t, 1
+                continue
+            # Imlo farqi (masalan "ў"/"у") uchun taxminiy o'xshashlik
+            ratio = SequenceMatcher(None, cand, target).ratio()
+            if ratio >= 0.84 and ratio > eng_yaqin_ratio:
+                eng_yaqin, eng_yaqin_ratio = t, ratio
         return eng_yaqin
 
     def norm_mahalla(s):
         """Mahalla nomini solishtirish uchun: norm() + 'MFY'/'mahalla(si)' so'zi va tire olib tashlanadi."""
         s = norm(s).replace('-', ' ')
-        s = re.sub(r'\b(mfy|mahalla(si)?|maxalla(si)?)\b', '', s)
+        s = re.sub(r'\b(mfy|mahalla(si)?|maxalla(si)?|qfy)\b', '', s)
         return re.sub(r'\s+', ' ', s).strip()
 
     def mahalla_top(tuman_id, mahalla_nomi_raw):
-        """Berilgan tuman ichida nomi bo'yicha (moslashuvchan) mahallani topadi.
+        """Berilgan tuman ichida nomi bo'yicha (moslashuvchan) mahallani topadi — avval aniq/qism mos
+        keladiganini, topilmasa esa imlo farqlariga (ў/у, bo'shliq bor/yo'q) chidamli eng yaqinini.
         Qaytaradi: (topilgan_mahalla_yoki_None, noaniq_nomzodlar_royxati)."""
         target = norm_mahalla(mahalla_nomi_raw)
         if not target:
             return None, []
-        nomzodlar = []
+        target_ns = target.replace(' ', '')
+        aniq_nomzodlar = []
+        eng_yaqin, eng_yaqin_ratio = None, 0
         for m in Mahalla.objects.filter(tuman_id=tuman_id):
             cand = norm_mahalla(m.mahalla_nomi)
-            if cand == target:
+            if not cand:
+                continue
+            if cand == target or cand.replace(' ', '') == target_ns:
                 return m, []
-            if cand and (cand in target or target in cand):
-                nomzodlar.append(m)
-        if len(nomzodlar) == 1:
-            return nomzodlar[0], []
-        return None, nomzodlar
+            if cand in target or target in cand:
+                aniq_nomzodlar.append(m)
+                continue
+            ratio = SequenceMatcher(None, cand, target).ratio()
+            if ratio >= 0.86 and ratio > eng_yaqin_ratio:
+                eng_yaqin, eng_yaqin_ratio = m, ratio
+        if len(aniq_nomzodlar) == 1:
+            return aniq_nomzodlar[0], []
+        if aniq_nomzodlar:
+            return None, aniq_nomzodlar
+        if eng_yaqin:
+            return eng_yaqin, []
+        return None, []
 
     # Shablondagi dropdown nomlari (murojaat_shablon dagi jinsi/holat/tarmoq_pairs bilan bir xil),
     # to'liq matn yozilsa ham (masalan "Takroriy murojaat") to'g'ri tanish uchun.
