@@ -49,6 +49,7 @@ export default function Login() {
       }
     } catch {
       toast.error("Login yoki parol noto'g'ri")
+      refreshCaptcha()
     } finally {
       setLoading(false)
     }
