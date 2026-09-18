@@ -337,7 +337,7 @@ def tasdiqlangan(request):
     return Response(HisobotSerializer(qs[:limit], many=True).data)
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsRespublika])
 def rasmlarni_ochir(request):
     start = request.GET.get('start')
     end   = request.GET.get('end')
@@ -723,6 +723,11 @@ def qilmaganlar(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def xabar_yuborish(request):
+    # Faqat viloyat admin — respublika/tuman uchun UI'da bu bo'lim yo'q, va
+    # ruxsat tekshiruvi bo'lmasa respublika (viloyat filtri bo'sh qolgani
+    # uchun) BUTUN MAMLAKAT bo'yicha barcha inspektorlarga xabar yubora oladi.
+    if request.user.role != 'viloyat':
+        return Response({'error': "Ruxsat yo'q"}, status=403)
     text = (request.data.get('matn') or request.data.get('xabar') or '').strip()
     if not text:
         return Response({'error': "Xabar bo'sh"}, status=400)
