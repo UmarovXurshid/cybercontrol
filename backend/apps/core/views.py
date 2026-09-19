@@ -2726,39 +2726,48 @@ def murojaat_import(request):
 
         def turi(t):
             n = norm(t.tuman_nomi)
-            if re.search(r'(^|\s)sh\.?$', n):
+            if re.search(r'(^|\s)(sh\.?|shahar|shahri)$', n):
                 return 'shahar'
-            if re.search(r'(^|\s)t\.?$', n):
+            if re.search(r'(^|\s)(t\.?|tuman|tumani)$', n):
                 return 'tuman'
             return None
+
+        def tanla(nomzodlar):
+            """Bir nechta mos kelganda faylda ko'rsatilgan tur (tuman/shahar) bo'yicha tanlaydi."""
+            if len(nomzodlar) == 1:
+                return nomzodlar[0]
+            hint = 'shahar' if hint_shahar else ('tuman' if hint_tuman else None)
+            if hint:
+                mos = [t for t in nomzodlar if turi(t) == hint]
+                if len(mos) == 1:
+                    return mos[0]
+            return nomzodlar[0]
 
         target = norm_tuman(tuman_nomi_raw)
         if not target:
             return None
         target_ns = target.replace(' ', '')
-        aniq, fuzzy_best, fuzzy_ratio = [], None, 0
+        teng, qism, fuzzy_best, fuzzy_ratio = [], [], None, 0
         for t in Tuman.objects.filter(viloyat_id=viloyat_id):
             cand = norm_tuman(t.tuman_nomi)
             if not cand:
                 continue
-            if cand == target or cand.replace(' ', '') == target_ns or cand in target or target in cand:
-                aniq.append(t)
+            if cand == target or cand.replace(' ', '') == target_ns:
+                teng.append(t)
+                continue
+            if cand in target or target in cand:
+                qism.append(t)
                 continue
             # Imlo farqi (masalan "ў"/"у") uchun taxminiy o'xshashlik
             ratio = SequenceMatcher(None, cand, target).ratio()
             if ratio >= 0.84 and ratio > fuzzy_ratio:
                 fuzzy_best, fuzzy_ratio = t, ratio
 
-        if len(aniq) == 1:
-            return aniq[0]
-        if len(aniq) > 1:
-            if hint_shahar:
-                mos = [t for t in aniq if turi(t) == 'shahar']
-            elif hint_tuman:
-                mos = [t for t in aniq if turi(t) == 'tuman']
-            else:
-                mos = []
-            return mos[0] if len(mos) == 1 else aniq[0]
+        # Aniq tenglik doim qisman mos kelishdan ustun ("Янги Наманган" != "Наманган")
+        if teng:
+            return tanla(teng)
+        if qism:
+            return tanla(qism)
         return fuzzy_best
 
     def norm_mahalla(s):
