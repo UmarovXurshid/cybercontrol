@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from datetime import date, datetime, timedelta
-import os, io, re, requests, openpyxl, base64
+import os, io, re, requests, openpyxl, base64, zipfile
 from difflib import SequenceMatcher
 from concurrent.futures import ThreadPoolExecutor
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -2651,6 +2651,28 @@ def murojaat_shablon(request):
     return resp
 
 
+def _xlsx_yukla(f):
+    """Excel faylni ochadi. Agar openpyxl tushunmaydigan filtr (autoFilter, masalan
+    'bo'sh joyga teng emas') bo'lsa, filtrni olib tashlab qayta urinadi — ma'lumot o'zgarmaydi."""
+    data = f.read()
+    try:
+        return openpyxl.load_workbook(io.BytesIO(data), data_only=True)
+    except Exception:
+        pass
+    src = zipfile.ZipFile(io.BytesIO(data))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as dst:
+        for item in src.infolist():
+            content = src.read(item.filename)
+            if item.filename.startswith('xl/worksheets/') and item.filename.endswith('.xml'):
+                s = content.decode('utf-8')
+                s = re.sub(r'<autoFilter\b[^>]*/>|<autoFilter\b.*?</autoFilter>', '', s, flags=re.S)
+                content = s.encode('utf-8')
+            dst.writestr(item, content)
+    buf.seek(0)
+    return openpyxl.load_workbook(buf, data_only=True)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def murojaat_import(request):
@@ -2664,7 +2686,7 @@ def murojaat_import(request):
         return Response({'error': 'Ruxsat yo\'q'}, status=403)
 
     try:
-        wb = openpyxl.load_workbook(f, data_only=True)
+        wb = _xlsx_yukla(f)
         ws = wb.active
     except Exception:
         return Response({'error': 'Excel faylni o\'qib bo\'lmadi'}, status=400)
