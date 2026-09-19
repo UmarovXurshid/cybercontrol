@@ -2798,6 +2798,8 @@ def murojaat_import(request):
         s = re.sub(r'\b(mfy|mahalla(si)?|maxalla(si)?|qfy)\b', '', s)
         return re.sub(r'\s+', ' ', s).strip()
 
+    taklif_box = [None]  # mahalla_top topa olmaganda eng yaqin nomzod (xato xabari uchun)
+
     def mahalla_top(tuman_id, mahalla_nomi_raw):
         """Berilgan tuman ichida nomi bo'yicha (moslashuvchan) mahallani topadi — avval aniq/qism mos
         keladiganini, topilmasa esa imlo farqlariga (ў/у, bo'shliq bor/yo'q) chidamli eng yaqinini
@@ -2829,6 +2831,8 @@ def murojaat_import(request):
             return None, aniq_nomzodlar
         if eng_yaqin and eng_yaqin_ratio >= 0.82 and eng_yaqin_ratio - ikkinchi_ratio >= 0.05:
             return eng_yaqin, []
+        if eng_yaqin:
+            taklif_box[0] = (eng_yaqin, eng_yaqin_ratio)  # xato xabarida ko'rsatish uchun
         return None, []
 
     # Shablondagi dropdown nomlari (murojaat_shablon dagi jinsi/holat/tarmoq_pairs bilan bir xil),
@@ -2918,14 +2922,24 @@ def murojaat_import(request):
             mahalla = None
             m_nomi = str(mahalla_nomi or '').strip()
             if m_nomi:
+                taklif_box[0] = None
                 mahalla, nomzodlar = mahalla_top(tuman.id, m_nomi)
                 if not mahalla:
                     if len(nomzodlar) > 1:
-                        errors.append({'qator': idx, 'sabab': f"Mahalla noaniq (bir nechta mos keldi): {mahalla_nomi}", 'row': row})
+                        nomlar = ', '.join(f"«{x.mahalla_nomi.strip()}»" for x in nomzodlar[:4])
+                        errors.append({'qator': idx, 'sabab': f"Mahalla noaniq (bir nechta mos keldi: {nomlar}): {mahalla_nomi}", 'row': row})
                         continue
                     else:
-                        errors.append({'qator': idx, 'sabab': f'Mahalla topilmadi: {mahalla_nomi}', 'row': row})
+                        sabab = f'Mahalla topilmadi: {mahalla_nomi}'
+                        if taklif_box[0] and taklif_box[0][1] >= 0.5:
+                            sabab += f" (bazada eng yaqin: «{taklif_box[0][0].mahalla_nomi.strip()}», {tuman.tuman_nomi.strip()})"
+                        errors.append({'qator': idx, 'sabab': sabab, 'row': row})
                         continue
+
+            # "Zarar yo'q" kabi matn — raqam emas, zarar yo'q deb hisoblanadi
+            zarar_qiymat = zarar
+            if isinstance(zarar, str) and re.search(r"йўқ|йук|yo'?q|yoq|нет|^\s*-+\s*$", zarar.lower()):
+                zarar_qiymat = None
 
             # Takroriy qatorni aniqlash — bir xil viloyat/tuman/sana bo'yicha F.I.SH
             # (yoki F.I.SH bo'lmasa telefon) allaqachon kiritilgan bo'lsa, qayta qo'shmaydi
@@ -2961,7 +2975,7 @@ def murojaat_import(request):
                 jinsi=kod_yoki_nomi(jinsi, JINSI_KOD, JINSI_MAP, ''),
                 telefon=str(telefon or '').strip(),
                 fabula=str(fabula or '').strip(),
-                zarar=zarar or None,
+                zarar=zarar_qiymat or None,
                 usul=usul,
                 kasb=kasb,
                 yosh=int(yosh) if yosh else None,
