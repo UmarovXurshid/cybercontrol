@@ -2730,109 +2730,90 @@ def murojaat_import(request):
         s = re.sub(r'\s+', ' ', s).strip()
         return s
 
-    def norm_tuman(s):
-        """Tuman nomini solishtirish uchun: norm() + 'tuman(i)'/'shahar/shahri' so'zi olib tashlanadi
-        (baza "Chiroqchi" deb, fayl esa "Chiroqchi tumani" deb yozgan bo'lishi mumkin)."""
-        s = norm(s)
-        s = re.sub(r'\b(tuman(i)?|shahar|shahri|viloyati?)\b', '', s)
+    def kalit(s):
+        """Tuman/mahalla nomini solishtirish kaliti: kirill<->lotin o'giriladi va o'zbekcha
+        harflarning turli yozilishi bir xil holatga keltiriladi: ў/у/o' , қ/к/q , ғ/г/g' , ҳ/х/h."""
+        s = kiril_lotin(str(s)).lower().replace('-', ' ')
+        apos = "['‘’ʻʼ`′]"
+        s = re.sub('o' + apos, 'u', s)
+        s = re.sub('g' + apos, 'g', s)
+        s = re.sub(apos + '|"', '', s)
+        s = s.replace('q', 'k').replace('h', 'x')
         return re.sub(r'\s+', ' ', s).strip()
 
+    _SHAHAR_RE = r'\b(sxaxar|sxaxri)\b|\ssx\.?$'
+    _TUMAN_RE  = r'\btuman(i)?\b|\st\.?$'
+
+    def norm_tuman(s):
+        """Tuman nomi: 'tumani/shahar' so'zi va bazadagi 't.'/'sh.' qisqartmasi olib tashlanadi."""
+        k = kalit(s)
+        k = re.sub(r'\b(tuman(i)?|sxaxar|sxaxri)\b', ' ', k)
+        k = re.sub(r'\s+(t|sx)\.?$', '', k)
+        return re.sub(r'\s+', ' ', k).strip()
+
     def tuman_top(viloyat_id, tuman_nomi_raw):
-        """Berilgan viloyat ichida nomi bo'yicha (moslashuvchan) tumanni topadi.
-        Ba'zi viloyatlarda bir xil nomli tuman va shahar alohida yozuvlar sifatida
-        saqlangan (masalan "Қарши  т." va "Қарши  ш.", "Шаҳрисабз т."/"Шаҳрисабз ш.") —
-        faylda "тумани" yoki "шахри/шахар" so'zi bo'lsa, shu turdagisi tanlanadi."""
-        raw = norm(tuman_nomi_raw)
-        hint_shahar = bool(re.search(r'\b(shahar|shahri)\b', raw))
-        hint_tuman  = (not hint_shahar) and bool(re.search(r'\btuman(i)?\b', raw))
-
-        def turi(t):
-            n = norm(t.tuman_nomi)
-            if re.search(r'(^|\s)(sh\.?|shahar|shahri)$', n):
-                return 'shahar'
-            if re.search(r'(^|\s)(t\.?|tuman|tumani)$', n):
-                return 'tuman'
-            return None
-
-        def tanla(nomzodlar):
-            """Bir nechta mos kelganda faylda ko'rsatilgan tur (tuman/shahar) bo'yicha tanlaydi."""
-            if len(nomzodlar) == 1:
-                return nomzodlar[0]
-            hint = 'shahar' if hint_shahar else ('tuman' if hint_tuman else None)
-            if hint:
-                mos = [t for t in nomzodlar if turi(t) == hint]
-                if len(mos) == 1:
-                    return mos[0]
-            return nomzodlar[0]
-
+        """Viloyat ichida tumanni nomi bo'yicha topadi (faqat yozilish farqlari e'tiborga olinadi).
+        Bir xil nomli tuman va shahar bo'lsa (masalan 'Наманган тумани'/'Наманган шахар'),
+        faylda 'тумани' yoki 'шахар' so'zi borligiga qarab tanlanadi."""
+        raw = kalit(tuman_nomi_raw)
+        hint_shahar = bool(re.search(_SHAHAR_RE, raw))
+        hint_tuman  = (not hint_shahar) and bool(re.search(_TUMAN_RE, raw))
         target = norm_tuman(tuman_nomi_raw)
         if not target:
             return None
         target_ns = target.replace(' ', '')
-        teng, qism, fuzzy_best, fuzzy_ratio = [], [], None, 0
+
+        def turi(t):
+            n = kalit(t.tuman_nomi)
+            if re.search(_SHAHAR_RE, n):
+                return 'shahar'
+            if re.search(_TUMAN_RE, n):
+                return 'tuman'
+            return None
+
+        teng = []
         for t in Tuman.objects.filter(viloyat_id=viloyat_id):
             cand = norm_tuman(t.tuman_nomi)
-            if not cand:
-                continue
-            if cand == target or cand.replace(' ', '') == target_ns:
+            if cand and (cand == target or cand.replace(' ', '') == target_ns):
                 teng.append(t)
-                continue
-            if cand in target or target in cand:
-                qism.append(t)
-                continue
-            # Imlo farqi (masalan "ў"/"у") uchun taxminiy o'xshashlik
-            ratio = SequenceMatcher(None, cand, target).ratio()
-            if ratio >= 0.84 and ratio > fuzzy_ratio:
-                fuzzy_best, fuzzy_ratio = t, ratio
-
-        # Aniq tenglik doim qisman mos kelishdan ustun ("Янги Наманган" != "Наманган")
-        if teng:
-            return tanla(teng)
-        if qism:
-            return tanla(qism)
-        return fuzzy_best
+        if not teng:
+            return None
+        if len(teng) > 1:
+            hint = 'shahar' if hint_shahar else ('tuman' if hint_tuman else None)
+            if hint:
+                mos = [t for t in teng if turi(t) == hint]
+                if len(mos) == 1:
+                    return mos[0]
+        return teng[0]
 
     def norm_mahalla(s):
-        """Mahalla nomini solishtirish uchun: norm() + 'MFY'/'mahalla(si)' so'zi va tire olib tashlanadi."""
-        s = norm(s).replace('-', ' ')
-        s = re.sub(r'\b(mfy|mahalla(si)?|maxalla(si)?|qfy)\b', '', s)
-        return re.sub(r'\s+', ' ', s).strip()
+        """Mahalla nomi: 'MFY/QFY/mahalla' so'zi olib tashlanadi."""
+        k = kalit(s)
+        k = re.sub(r'\b(mfy|kfy|maxalla(si)?)\b', ' ', k)
+        return re.sub(r'\s+', ' ', k).strip()
 
-    taklif_box = [None]  # mahalla_top topa olmaganda eng yaqin nomzod (xato xabari uchun)
+    taklif_box = [None]  # topilmagan mahalla uchun bazadagi eng yaqin nom (faqat xato xabarida ko'rsatiladi)
 
     def mahalla_top(tuman_id, mahalla_nomi_raw):
-        """Berilgan tuman ichida nomi bo'yicha (moslashuvchan) mahallani topadi — avval aniq/qism mos
-        keladiganini, topilmasa esa imlo farqlariga (ў/у, bo'shliq bor/yo'q) chidamli eng yaqinini
-        (faqat ikkinchi eng yaqinidan sezilarli farq qilsa — aks holda noaniq deb qoldiriladi).
-        Qaytaradi: (topilgan_mahalla_yoki_None, noaniq_nomzodlar_royxati)."""
+        """Tuman ichida mahallani nomi bo'yicha topadi. Faqat yozilish farqlari (kirill/lotin,
+        ў/у/o', қ/к/q, ғ/г/g', ҳ/х/h, bo'shliq/tire, МФЙ so'zi) e'tiborga olinadi — taxminiy
+        o'xshashlik bilan moslashtirilmaydi. Qaytaradi: (mahalla_yoki_None, [])."""
         target = norm_mahalla(mahalla_nomi_raw)
         if not target:
             return None, []
         target_ns = target.replace(' ', '')
-        aniq_nomzodlar = []
-        eng_yaqin, eng_yaqin_ratio, ikkinchi_ratio = None, 0, 0
+        eng_yaqin, eng_yaqin_ratio = None, 0
         for m in Mahalla.objects.filter(tuman_id=tuman_id):
             cand = norm_mahalla(m.mahalla_nomi)
             if not cand:
                 continue
             if cand == target or cand.replace(' ', '') == target_ns:
                 return m, []
-            if cand in target or target in cand:
-                aniq_nomzodlar.append(m)
-                continue
             ratio = SequenceMatcher(None, cand, target).ratio()
             if ratio > eng_yaqin_ratio:
-                eng_yaqin, eng_yaqin_ratio, ikkinchi_ratio = m, ratio, eng_yaqin_ratio
-            elif ratio > ikkinchi_ratio:
-                ikkinchi_ratio = ratio
-        if len(aniq_nomzodlar) == 1:
-            return aniq_nomzodlar[0], []
-        if aniq_nomzodlar:
-            return None, aniq_nomzodlar
-        if eng_yaqin and eng_yaqin_ratio >= 0.82 and eng_yaqin_ratio - ikkinchi_ratio >= 0.05:
-            return eng_yaqin, []
+                eng_yaqin, eng_yaqin_ratio = m, ratio
         if eng_yaqin:
-            taklif_box[0] = (eng_yaqin, eng_yaqin_ratio)  # xato xabarida ko'rsatish uchun
+            taklif_box[0] = (eng_yaqin, eng_yaqin_ratio)
         return None, []
 
     # Shablondagi dropdown nomlari (murojaat_shablon dagi jinsi/holat/tarmoq_pairs bilan bir xil),
