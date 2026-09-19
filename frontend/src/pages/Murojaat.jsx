@@ -392,6 +392,9 @@ function MurojaatImport({ onDone }) {
       {natija && (
         <div className="mt-3 text-sm">
           <p className="text-green-700">✅ {natija.created} ta murojaat qo'shildi.</p>
+          {natija.tuman_tuzatildi > 0 && (
+            <p className="text-blue-700">ℹ️ {natija.tuman_tuzatildi} ta qatorda fayldagi tuman mahalla bilan mos kelmadi — mahalla bazadagi tumaniga biriktirildi.</p>
+          )}
           {natija.skipped > 0 && (
             <p className="text-amber-600">⚠️ {natija.skipped} ta qator takroriy bo'lgani uchun o'tkazib yuborildi (avval kiritilgan).</p>
           )}

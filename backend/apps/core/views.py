@@ -2867,6 +2867,20 @@ def murojaat_import(request):
 
     created = 0
     skipped = 0
+    tuman_tuzatildi = 0
+
+    vil_kesh = {}
+
+    def mahalla_viloyatda(viloyat_id, nom):
+        """Mahalla fayldagi tumanda topilmasa — butun viloyat bo'yicha aniq (yozilish farqlarisiz) nom qidiradi."""
+        if viloyat_id not in vil_kesh:
+            d = {}
+            for x in Mahalla.objects.filter(tuman__viloyat_id=viloyat_id).select_related('tuman'):
+                k = norm_mahalla(x.mahalla_nomi).replace(' ', '')
+                if k:
+                    d.setdefault(k, []).append(x)
+            vil_kesh[viloyat_id] = d
+        return vil_kesh[viloyat_id].get(norm_mahalla(nom).replace(' ', ''), [])
     errors  = []
     rows = list(ws.iter_rows(min_row=2, values_only=True))
     for idx, row in enumerate(rows, start=2):
@@ -2906,9 +2920,17 @@ def murojaat_import(request):
                 taklif_box[0] = None
                 mahalla, nomzodlar = mahalla_top(tuman.id, m_nomi)
                 if not mahalla:
-                    if len(nomzodlar) > 1:
-                        nomlar = ', '.join(f"«{x.mahalla_nomi.strip()}»" for x in nomzodlar[:4])
-                        errors.append({'qator': idx, 'sabab': f"Mahalla noaniq (bir nechta mos keldi: {nomlar}): {mahalla_nomi}", 'row': row})
+                    # Fayldagi tumanda yo'q — viloyatning boshqa tumanlarida shu nomli mahalla bormi?
+                    boshqa = mahalla_viloyatda(viloyat_id, m_nomi) if role != 'tuman' else []
+                    boshqa_tumanlar = {x.tuman_id for x in boshqa}
+                    if len(boshqa_tumanlar) == 1:
+                        mahalla = boshqa[0]
+                        tuman = mahalla.tuman
+                        tuman_tuzatildi += 1
+                    elif len(boshqa_tumanlar) > 1:
+                        tnomlar = ', '.join(sorted({x.tuman.tuman_nomi.strip() for x in boshqa}))
+                        errors.append({'qator': idx, 'row': row, 'sabab':
+                            f"Mahalla «{mahalla_nomi}» ko'rsatilgan tumanda yo'q, lekin bir nechta tumanda bor ({tnomlar}) — tumanni to'g'rilang"})
                         continue
                     else:
                         sabab = f'Mahalla topilmadi: {mahalla_nomi}'
@@ -3001,7 +3023,8 @@ def murojaat_import(request):
         er.pop('row', None)
 
     audit(request, 'murojaat_import', f"{created} ta import qilindi, {skipped} ta takroriy o'tkazib yuborildi, {len(errors)} ta xato")
-    return Response({'created': created, 'skipped': skipped, 'errors': errors, 'xato_fayl_base64': xato_fayl_base64})
+    return Response({'created': created, 'skipped': skipped, 'tuman_tuzatildi': tuman_tuzatildi,
+                     'errors': errors, 'xato_fayl_base64': xato_fayl_base64})
 
 
 # ── Murojaat Hisobot ──────────────────────────────────────────────────────────
