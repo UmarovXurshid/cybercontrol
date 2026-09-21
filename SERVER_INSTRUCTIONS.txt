@@ -1,4 +1,4 @@
-══════════════════════════════════════════════════════
+﻿══════════════════════════════════════════════════════
    CyberControl — Server o'rnatish yo'riqnomasi
 ══════════════════════════════════════════════════════
 
@@ -62,7 +62,7 @@ FOYDALI BUYRUQLAR:
   Restart:      docker compose restart
   To'xtatish:   docker compose down
   Yangi backup: docker exec cybercontrol-new-db-1 \
-                  mysqldump -u cybercon_bot -pqr4n53e5XB96zRUDUKL7 \
+                  mysqldump -u cybercon_bot -p<DB_PAROLI> \
                   cybercon_bot > backup.sql
 
 ─────────────────────────────────────────────────────

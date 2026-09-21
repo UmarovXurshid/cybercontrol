@@ -28,12 +28,12 @@ services:
       DB_NAME: cybercon_bot
       DB_USER: cybercon_bot
       DB_PASSWORD: qr4n53e5XB96zRUDUKL7
-      SECRET_KEY: "cybercontrol-django-secret-2024-change-in-prod"
+      SECRET_KEY: "${SECRET_KEY}"
       DEBUG: "1"
       PYTHONUNBUFFERED: "1"
       ALLOWED_HOSTS: "localhost,127.0.0.1,backend,109.94.172.25"
       CORS_ORIGINS: "http://109.94.172.25:8080"
-      TELEGRAM_TOKEN: "7799570288:AAG-hM-WseDjMFPFb4QG9VA22YDqNv2eZn8"
+      TELEGRAM_TOKEN: "${TELEGRAM_TOKEN}"
     volumes:
       - ./backend/apps:/app/apps
       - ./backend/media:/app/media
@@ -56,10 +56,10 @@ services:
       DB_NAME: cybercon_bot
       DB_USER: cybercon_bot
       DB_PASSWORD: qr4n53e5XB96zRUDUKL7
-      SECRET_KEY: "cybercontrol-django-secret-2024-change-in-prod"
+      SECRET_KEY: "${SECRET_KEY}"
       DEBUG: "1"
       PYTHONUNBUFFERED: "1"
-      TELEGRAM_TOKEN: "7799570288:AAG-hM-WseDjMFPFb4QG9VA22YDqNv2eZn8"
+      TELEGRAM_TOKEN: "${TELEGRAM_TOKEN}"
     volumes:
       - ./backend/apps:/app/apps
       - ./backend/media:/app/media

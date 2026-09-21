@@ -59,7 +59,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': os.environ.get('DB_NAME', 'cybercon_bot'),
         'USER': os.environ.get('DB_USER', 'cybercon_bot'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'qr4n53e5XB96zRUDUKL7'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
         'HOST': os.environ.get('DB_HOST', 'localhost'),
         'PORT': os.environ.get('DB_PORT', '3306'),
         'OPTIONS': {'charset': 'utf8mb4'},
@@ -106,4 +106,4 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN', '7799570288:AAG-hM-WseDjMFPFb4QG9VA22YDqNv2eZn8')
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN', '')  # faqat muhit o'zgaruvchisidan (repo ochiq — kodda saqlanmaydi)

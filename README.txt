@@ -1,4 +1,4 @@
-══════════════════════════════════════════════
+﻿══════════════════════════════════════════════
    CyberControl — Ishlatish yo'riqnomasi
 ══════════════════════════════════════════════
 
@@ -37,6 +37,6 @@ FOYDALI BUYRUQLAR (CMD/PowerShell):
   Holat:    docker compose ps
   Loglar:   docker compose logs -f backend
   Restart:  docker compose restart
-  Baza:     docker compose exec db mysql -u cybercon_bot -pqr4n53e5XB96zRUDUKL7 cybercon_bot
+  Baza:     docker compose exec db mysql -u cybercon_bot -p<DB_PAROLI> cybercon_bot
 
 ══════════════════════════════════════════════
