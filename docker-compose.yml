@@ -31,8 +31,8 @@ services:
       SECRET_KEY: "${SECRET_KEY}"
       DEBUG: "${DEBUG:-0}"
       PYTHONUNBUFFERED: "1"
-      ALLOWED_HOSTS: "localhost,127.0.0.1,backend,109.94.172.25"
-      CORS_ORIGINS: "http://109.94.172.25:8080"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,backend,109.94.172.25,cybercontrol.uz,www.cybercontrol.uz"
+      CORS_ORIGINS: "http://109.94.172.25:8080,https://cybercontrol.uz,https://www.cybercontrol.uz"
       TELEGRAM_TOKEN: "${TELEGRAM_TOKEN}"
     volumes:
       - ./backend/apps:/app/apps
