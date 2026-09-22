@@ -1,4 +1,4 @@
-"""
+﻿"""
 Viloyat mahallalari va inspektorlarini Excel ro'yxatdan yangilaydi (sinxronlash).
 
   python manage.py mahalla_yangila /tmp/namangan.xlsx --viloyat 132            # SINOV: hech narsa yozilmaydi
@@ -7,11 +7,11 @@ Viloyat mahallalari va inspektorlarini Excel ro'yxatdan yangilaydi (sinxronlash)
 Fayl ustunlari: # | Mahalla | Tuman | Inspektor | Telefon | Telegram ID | Navbatchilik 1 | Navbatchilik 2 | Turi
 
 Qoidalar (xavfsizlik uchun hech narsa o'chirilmaydi):
-- Mahalla (tuman + nom) bo'yicha topiladi (kirill/lotin, ў/у/o', қ/к/q, ғ/г/g', ҳ/х/h, МФЙ so'zi,
-  bo'shliq/tire farqlariga e'tiborsiz). Topilsa — ID saqlanadi (hisobotlar/murojaatlar uzilmaydi),
-  nomi fayldagidek yangilanadi. Topilmasa — yangi mahalla yaratiladi.
+- Mahalla (tuman + nom) bo'yicha topiladi (kirill/lotin, Сћ/Сѓ/o', Т›/Рє/q, Т“/Рі/g', Ті/С…/h, РњР¤Р™ so'zi,
+  bo'shliq/tire farqlariga e'tiborsiz). Topilsa вЂ” ID saqlanadi (hisobotlar/murojaatlar uzilmaydi),
+  nomi fayldagidek yangilanadi. Topilmasa вЂ” yangi mahalla yaratiladi.
 - Fayldagi inspektor telefoni (12 xonali 998XXXXXXXXX ga keltiriladi) bo'yicha shu mahalladagi
-  Inspektor topiladi: F.I.SH yangilanadi, tg_id SAQLANADI. Topilmasa — yangi inspektor yaratiladi.
+  Inspektor topiladi: F.I.SH yangilanadi, tg_id SAQLANADI. Topilmasa вЂ” yangi inspektor yaratiladi.
 - Ro'yxatda bo'lmagan eski inspektorlar o'chirilmaydi, is_active=False qilinadi.
 - Faylda bo'lmagan mahallalarga tegilmaydi (faqat hisobotda ko'rsatiladi).
 - Navbatchilik kunlari mavjud mahallalarda o'zgartirilmaydi (faqat yangi mahallalarga fayldan olinadi).
@@ -26,15 +26,15 @@ from django.db import transaction
 from apps.core.models import Tuman, Mahalla, Inspektor
 
 _KIRIL_LOTIN = {
-    'ё': 'yo', 'ж': 'j', 'ц': 's', 'ч': 'ch', 'ш': 'sh', 'щ': 'sh',
-    'ъ': "'", 'ы': 'i', 'э': 'e', 'ю': 'yu', 'я': 'ya',
-    'ў': "o'", 'қ': 'q', 'ғ': "g'", 'ҳ': 'h',
-    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e',
-    'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
-    'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
-    'у': 'u', 'ф': 'f', 'х': 'x',
+    'С‘': 'yo', 'Р¶': 'j', 'С†': 's', 'С‡': 'ch', 'С€': 'sh', 'С‰': 'sh',
+    'СЉ': "'", 'С‹': 'i', 'СЌ': 'e', 'СЋ': 'yu', 'СЏ': 'ya',
+    'Сћ': "o'", 'Т›': 'q', 'Т“': "g'", 'Ті': 'h',
+    'Р°': 'a', 'Р±': 'b', 'РІ': 'v', 'Рі': 'g', 'Рґ': 'd', 'Рµ': 'e',
+    'Р·': 'z', 'Рё': 'i', 'Р№': 'y', 'Рє': 'k', 'Р»': 'l', 'Рј': 'm',
+    'РЅ': 'n', 'Рѕ': 'o', 'Рї': 'p', 'СЂ': 'r', 'СЃ': 's', 'С‚': 't',
+    'Сѓ': 'u', 'С„': 'f', 'С…': 'x',
 }
-_APOS = "['‘’ʻʼ`′]"
+_APOS = "['вЂвЂ™К»Кј`вЂІ]"
 _SHAHAR_RE = r'\b(sxaxar|sxaxri)\b|\ssx\.?$'
 _TUMAN_RE = r'\btuman(i)?\b|\st\.?$'
 KUNLAR = {'yakshanba': 0, 'dushanba': 1, 'seshanba': 2, 'chorshanba': 3, 'payshanba': 4, 'juma': 5, 'shanba': 6}
@@ -50,6 +50,7 @@ def kalit(s):
     s = re.sub('g' + _APOS, 'g', s)
     s = re.sub(_APOS + '|"', '', s)
     s = s.replace('q', 'k').replace('h', 'x')
+    s = s.replace('ye', 'e')  # "Йе" bilan "Е" bir xil o'qiladi, so'z ichida ham (Елихон=Йелихон, Янгиер=Йангийер)
     return re.sub(r'\s+', ' ', s).strip()
 
 
@@ -116,7 +117,7 @@ class Command(BaseCommand):
         if not tumanlar:
             raise CommandError("Bu viloyatda tuman topilmadi")
 
-        # ── Fayl: (tuman_id, mahalla kaliti) -> yozuv ─────────────────────────
+        # в”Ђв”Ђ Fayl: (tuman_id, mahalla kaliti) -> yozuv в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
         yozuvlar = collections.OrderedDict()
         tuman_topilmadi = collections.Counter()
         noto_tel = []
@@ -146,7 +147,7 @@ class Command(BaseCommand):
             if all(tl != x[1] for x in y['ins']):
                 y['ins'].append((fio, tl))
 
-        # ── Baza mahallalari ──────────────────────────────────────────────────
+        # в”Ђв”Ђ Baza mahallalari в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
         baza = collections.defaultdict(list)   # (tuman_id, kalit) -> [Mahalla]
         for m in Mahalla.objects.filter(tuman__viloyat_id=vid, is_tuman=False, is_viloyat=False):
             baza[(m.tuman_id, norm_mahalla(m.mahalla_nomi))].append(m)
@@ -245,3 +246,4 @@ class Command(BaseCommand):
             w("\n--- Noto'g'ri telefonlar ---")
             for x in noto_tel[:15]:
                 w(f"  {x}")
+
