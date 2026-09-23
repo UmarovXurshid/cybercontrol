@@ -234,19 +234,21 @@ class KunlikIshlar(models.Model):
     uchrashuv_proof_rasm    = models.CharField(max_length=500, blank=True, default='')
 
     # ── OAV ──
+    # oav_*_url: har biri isbotlar ro'yxati - [{"url": "...", "rasm": "..."}, ...]
+    # (bitta chiqish uchun bir nechta havola/rasm biriktirish mumkin)
     oav_tv_soni             = models.IntegerField(default=0)
-    oav_tv_url              = models.CharField(max_length=500, blank=True, default='')
+    oav_tv_url              = models.JSONField(default=list, blank=True)
     oav_radio_soni          = models.IntegerField(default=0)
-    oav_radio_url           = models.CharField(max_length=500, blank=True, default='')
+    oav_radio_url           = models.JSONField(default=list, blank=True)
     oav_gazeta_jurnal_soni  = models.IntegerField(default=0)
-    oav_gazeta_jurnal_url   = models.CharField(max_length=500, blank=True, default='')
+    oav_gazeta_jurnal_url   = models.JSONField(default=list, blank=True)
     oav_video_soni          = models.IntegerField(default=0)
     oav_video_10k           = models.IntegerField(default=0)
     oav_video_100k          = models.IntegerField(default=0)
     oav_video_1m            = models.IntegerField(default=0)
     oav_video_url           = models.CharField(max_length=500, blank=True, default='')
     oav_internet_soni       = models.IntegerField(default=0)
-    oav_internet_url        = models.CharField(max_length=500, blank=True, default='')
+    oav_internet_url        = models.JSONField(default=list, blank=True)
 
     # ── Materiallar ──
     mat_ijtimoiy_tarmoq     = models.IntegerField(default=0)

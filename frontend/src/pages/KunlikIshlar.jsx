@@ -50,6 +50,65 @@ function ProofUpload({ label, urlVal, rasmVal, onUrl, onRasm, disabled }) {
   )
 }
 
+/* ── OAV chiqishi uchun bir nechta havola/rasm ro'yxati ────────────────────── */
+function OavProofList({ items, onChange, disabled }) {
+  const ref = useRef()
+  const [uploading, setUploading] = useState(false)
+  const [urlInput, setUrlInput] = useState('')
+  const list = Array.isArray(items) ? items : []
+
+  const addUrl = () => {
+    if (!urlInput.trim()) return
+    onChange([...list, { url: urlInput.trim(), rasm: '' }])
+    setUrlInput('')
+  }
+  const removeAt = (i) => onChange(list.filter((_, idx) => idx !== i))
+  const uploadRasm = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const fd = new FormData(); fd.append('rasm', file)
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/kunlik-ishlar/rasm/', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd
+      })
+      const data = await res.json()
+      onChange([...list, { url: '', rasm: data.url }])
+      toast.success('Rasm yuklandi')
+    } catch { toast.error('Yuklashda xato') }
+    finally { setUploading(false); e.target.value = '' }
+  }
+
+  return (
+    <div className="mt-1 space-y-1 pl-3">
+      {list.map((it, i) => (
+        <div key={i} className="flex items-center gap-2 text-xs">
+          {it.url && <a href={it.url} target="_blank" rel="noreferrer" className="text-blue-600 underline truncate max-w-xs">{it.url}</a>}
+          {it.rasm && <a href={`/media/images/${it.rasm}`} target="_blank" rel="noreferrer" className="text-blue-600 underline">📎 Rasm {i + 1}</a>}
+          {!disabled && <button type="button" onClick={() => removeAt(i)} className="text-red-500 hover:text-red-700">✕</button>}
+        </div>
+      ))}
+      {!disabled && (
+        <div className="flex flex-wrap gap-2 items-center">
+          <input type="url" placeholder="🔗 URL havola..." value={urlInput}
+            onChange={e => setUrlInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addUrl() } }}
+            className="border border-gray-300 rounded px-2 py-1 text-xs w-60 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+          <button type="button" onClick={addUrl}
+            className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border border-gray-300">+ Qo'shish</button>
+          <span className="text-xs text-gray-400">yoki</span>
+          <button type="button" disabled={uploading} onClick={() => ref.current.click()}
+            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 disabled:opacity-50">
+            {uploading ? '⏳' : '📷'} Rasm yuklash
+          </button>
+          <input ref={ref} type="file" accept="image/*" className="hidden" onChange={uploadRasm} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Num({ label, field, val, onChange, disabled, highlight }) {
   return (
     <div className={`flex items-center justify-between py-1.5 px-3 rounded ${highlight ? 'bg-blue-50' : ''}`}>
@@ -586,12 +645,7 @@ export default function KunlikIshlar() {
               ].map(({ label, soni, url }) => (
                 <div key={soni} className="px-3 py-2">
                   <Num label={label} field={soni} val={form[soni] || 0} onChange={set} disabled={!canEdit} />
-                  {canEdit
-                    ? <div className="pl-3"><input type="url" placeholder="🔗 URL havola..."
-                        value={form[url] || ''} onChange={e => set(url, e.target.value)}
-                        className="mt-1 border border-gray-300 rounded px-2 py-1 text-xs w-72 focus:outline-none focus:ring-1 focus:ring-indigo-400" /></div>
-                    : form[url] && <div className="pl-3 text-xs"><a href={form[url]} target="_blank" rel="noreferrer" className="text-blue-600 underline">{form[url]}</a></div>
-                  }
+                  <OavProofList items={form[url]} onChange={v => set(url, v)} disabled={!canEdit} />
                 </div>
               ))}
               <div className="px-3 py-2">
