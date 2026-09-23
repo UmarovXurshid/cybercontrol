@@ -1,0 +1,7 @@
+media/
+staticfiles/
+__pycache__/
+*.pyc
+.git/
+venv/
+*.log
