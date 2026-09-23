@@ -1,6 +1,8 @@
 from django.db import connection
 from django.db.models import Count, Sum, Q
 from django.utils import timezone
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import IsAuthenticated
@@ -132,6 +134,33 @@ def get_viloyat_sql(request):
     if vid:
         return ' AND tuman.viloyat_id = %s', [int(vid)]
     return '', []
+
+def check_scope_write(request, viloyat_id, tuman_id=None):
+    """
+    Yozish (create/update) uchun: mijoz yuborgan FK (mahalla/tuman/tashkilot orqali
+    olingan viloyat_id/tuman_id) so'rovchining o'z hududiga tegishli ekanini
+    tekshiradi. respublika — cheklovsiz. Mos kelmasa ValidationError.
+    """
+    role = request.user.role
+    if role == 'respublika':
+        return
+    if role == 'viloyat':
+        if viloyat_id != request.user.viloyat_id:
+            raise ValidationError("Faqat o'z viloyatingiz doirasida amal qilishingiz mumkin")
+        return
+    if role == 'tuman':
+        if tuman_id != request.user.tuman_id:
+            raise ValidationError("Faqat o'z tumaningiz doirasida amal qilishingiz mumkin")
+        return
+
+def set_user_password(user, parol):
+    """Parolni AUTH_PASSWORD_VALIDATORS orqali tekshirib, so'ng o'rnatadi."""
+    try:
+        validate_password(parol, user=user)
+    except DjangoValidationError as e:
+        raise ValidationError({'parol': e.messages})
+    user.set_password(parol)
+    user.save()
 
 # ── Respublika Dashboard ──────────────────────────────────────────────────────
 @api_view(['GET'])
@@ -344,12 +373,15 @@ def rasmlarni_ochir(request):
     vf    = get_viloyat_qs_filter(request)
     qs    = Hisobot.objects.filter(status=2, qushilgan_vaqt__date__gte=start,
                                    qushilgan_vaqt__date__lte=end, **vf)
+    o_chirildi = 0
     for h in qs:
         for r in h.rasmlar.all():
             path = os.path.join(settings.MEDIA_ROOT, 'images', r.rasm_url)
             if os.path.exists(path):
                 os.remove(path)
             r.delete()
+            o_chirildi += 1
+    audit(request, 'rasmlarni_ochirish', f"{start} - {end} oralig'ida {o_chirildi} ta rasm o'chirildi")
     return Response({'ok': True})
 
 # ── Rad etilgan ───────────────────────────────────────────────────────────────
@@ -959,10 +991,16 @@ class MahallaViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
+        tuman = serializer.validated_data.get('tuman')
+        if not tuman:
+            raise ValidationError({'tuman': "Tuman ko'rsatilishi shart"})
+        check_scope_write(self.request, tuman.viloyat_id, tuman.id)
         instance = serializer.save()
         audit(self.request, 'mahalla_yaratish', f"Mahalla yaratildi: {instance.mahalla_nomi}")
 
     def perform_update(self, serializer):
+        tuman = serializer.validated_data.get('tuman', serializer.instance.tuman)
+        check_scope_write(self.request, tuman.viloyat_id, tuman.id)
         instance = serializer.save()
         audit(self.request, 'mahalla_tahrirlash', f"Mahalla tahrirlandi: {instance.mahalla_nomi}")
 
@@ -1030,12 +1068,31 @@ class TumanViewSet(viewsets.ModelViewSet):
         return Tuman.objects.filter(**vf)
 
     def perform_create(self, serializer):
-        # Viloyat admin yangi tuman yaratganda o'z viloyatini avtomatik biriktiradi
-        if (self.request.user.role == 'viloyat'
-                and not serializer.validated_data.get('viloyat')):
-            serializer.save(viloyat_id=self.request.user.viloyat_id)
+        role = self.request.user.role
+        if role == 'tuman':
+            raise ValidationError("Ruxsat yo'q")
+        if role == 'viloyat':
+            # Viloyat admin yangi tuman yaratganda faqat o'z viloyatiga biriktira oladi
+            # (mijoz boshqa viloyat yuborsa ham e'tiborsiz qoldiriladi)
+            instance = serializer.save(viloyat_id=self.request.user.viloyat_id)
         else:
-            serializer.save()
+            instance = serializer.save()
+        audit(self.request, 'tuman_yaratish', f"Tuman yaratildi: {instance.tuman_nomi}")
+
+    def perform_update(self, serializer):
+        role = self.request.user.role
+        if role == 'tuman':
+            # tuman-admin o'z tumanini ko'ra oladi, lekin viloyatini o'zgartira olmaydi
+            instance = serializer.save(viloyat_id=serializer.instance.viloyat_id)
+        elif role == 'viloyat':
+            instance = serializer.save(viloyat_id=self.request.user.viloyat_id)
+        else:
+            instance = serializer.save()
+        audit(self.request, 'tuman_tahrirlash', f"Tuman tahrirlandi: {instance.tuman_nomi}")
+
+    def perform_destroy(self, instance):
+        audit(self.request, 'tuman_ochirish', f"Tuman o'chirildi: {instance.tuman_nomi}")
+        instance.delete()
 
 # ── Inspektor CRUD ───────────────────────────────────────────────────────────
 class InspektorViewSet(viewsets.ModelViewSet):
@@ -1052,11 +1109,41 @@ class InspektorViewSet(viewsets.ModelViewSet):
         vf = get_viloyat_qs_filter(self.request, 'mahalla__tuman__viloyat_id')
         return qs.filter(**vf)
 
+    def perform_create(self, serializer):
+        mahalla = serializer.validated_data.get('mahalla')
+        if not mahalla:
+            raise ValidationError({'mahalla': "Mahalla ko'rsatilishi shart"})
+        check_scope_write(self.request, mahalla.tuman.viloyat_id, mahalla.tuman_id)
+        instance = serializer.save()
+        audit(self.request, 'inspektor_yaratish', f"Inspektor yaratildi: {instance.fio} ({mahalla.mahalla_nomi})")
+
+    def perform_update(self, serializer):
+        mahalla = serializer.validated_data.get('mahalla', serializer.instance.mahalla)
+        check_scope_write(self.request, mahalla.tuman.viloyat_id, mahalla.tuman_id)
+        instance = serializer.save()
+        audit(self.request, 'inspektor_tahrirlash', f"Inspektor tahrirlandi: {instance.fio} ({mahalla.mahalla_nomi})")
+
+    def perform_destroy(self, instance):
+        audit(self.request, 'inspektor_ochirish', f"Inspektor o'chirildi: {instance.fio}")
+        instance.delete()
+
 # ── Viloyat CRUD (faqat respublika) ──────────────────────────────────────────
 class ViloyatViewSet(viewsets.ModelViewSet):
     queryset            = Viloyat.objects.all()
     serializer_class    = ViloyatSerializer
     permission_classes  = [IsAuthenticated, IsRespublika]
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        audit(self.request, 'viloyat_yaratish', f"Viloyat yaratildi: {instance.nomi}")
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        audit(self.request, 'viloyat_tahrirlash', f"Viloyat tahrirlandi: {instance.nomi}")
+
+    def perform_destroy(self, instance):
+        audit(self.request, 'viloyat_ochirish', f"Viloyat o'chirildi: {instance.nomi}")
+        instance.delete()
 
 # ── Foydalanuvchilar CRUD (faqat respublika) ──────────────────────────────────
 def _tuman_admin_ruxsat_etilganmi(tuman):
@@ -1094,8 +1181,8 @@ class FoydalanuvchiViewSet(viewsets.ModelViewSet):
         user = serializer.save(**extra)
         parol = self.request.data.get('parol')
         if parol:
-            user.set_password(parol)
-            user.save()
+            set_user_password(user, parol)
+        audit(self.request, 'foydalanuvchi_yaratish', f"Foydalanuvchi yaratildi: {user.username} ({user.role})")
 
     def perform_update(self, serializer):
         u = self.request.user
@@ -1116,8 +1203,12 @@ class FoydalanuvchiViewSet(viewsets.ModelViewSet):
         user = serializer.save(**extra)
         parol = self.request.data.get('parol')
         if parol:
-            user.set_password(parol)
-            user.save()
+            set_user_password(user, parol)
+        audit(self.request, 'foydalanuvchi_tahrirlash', f"Foydalanuvchi tahrirlandi: {user.username} ({user.role})")
+
+    def perform_destroy(self, instance):
+        audit(self.request, 'foydalanuvchi_ochirish', f"Foydalanuvchi o'chirildi: {instance.username} ({instance.role})")
+        instance.delete()
 
 # ── Hamkor tashkilotlar CRUD ─────────────────────────────────────────────────
 class HamkorTashkilotViewSet(viewsets.ModelViewSet):
@@ -1129,12 +1220,29 @@ class HamkorTashkilotViewSet(viewsets.ModelViewSet):
         return HamkorTashkilot.objects.select_related('viloyat').prefetch_related('xodimlar').filter(**vf)
 
     def perform_create(self, serializer):
-        if self.request.user.role == 'tuman' and not serializer.validated_data.get('tuman'):
-            serializer.save(viloyat_id=self.request.user.viloyat_id, tuman_id=self.request.user.tuman_id)
-        elif self.request.user.role == 'viloyat' and not serializer.validated_data.get('viloyat'):
-            serializer.save(viloyat_id=self.request.user.viloyat_id)
+        role = self.request.user.role
+        if role == 'tuman':
+            # tuman-admin faqat o'z tumaniga tashkilot yaratadi (mijoz boshqa qiymat yuborsa ham)
+            instance = serializer.save(viloyat_id=self.request.user.viloyat_id, tuman_id=self.request.user.tuman_id)
+        elif role == 'viloyat':
+            instance = serializer.save(viloyat_id=self.request.user.viloyat_id)
         else:
-            serializer.save()
+            instance = serializer.save()
+        audit(self.request, 'hamkor_tashkilot_yaratish', f"Hamkor tashkilot yaratildi: {instance.nomi}")
+
+    def perform_update(self, serializer):
+        role = self.request.user.role
+        if role == 'tuman':
+            instance = serializer.save(viloyat_id=self.request.user.viloyat_id, tuman_id=self.request.user.tuman_id)
+        elif role == 'viloyat':
+            instance = serializer.save(viloyat_id=self.request.user.viloyat_id)
+        else:
+            instance = serializer.save()
+        audit(self.request, 'hamkor_tashkilot_tahrirlash', f"Hamkor tashkilot tahrirlandi: {instance.nomi}")
+
+    def perform_destroy(self, instance):
+        audit(self.request, 'hamkor_tashkilot_ochirish', f"Hamkor tashkilot o'chirildi: {instance.nomi}")
+        instance.delete()
 
 
 class HamkorXodimViewSet(viewsets.ModelViewSet):
@@ -1149,14 +1257,59 @@ class HamkorXodimViewSet(viewsets.ModelViewSet):
         vf = get_viloyat_qs_filter(self.request, 'tashkilot__viloyat_id', tuman_prefix='tashkilot__tuman_id')
         return qs.filter(**vf)
 
+    def perform_create(self, serializer):
+        tashkilot = serializer.validated_data.get('tashkilot')
+        if not tashkilot:
+            raise ValidationError({'tashkilot': "Tashkilot ko'rsatilishi shart"})
+        check_scope_write(self.request, tashkilot.viloyat_id, tashkilot.tuman_id)
+        instance = serializer.save()
+        audit(self.request, 'hamkor_xodim_yaratish', f"Hamkor xodim yaratildi: {instance.fio} ({tashkilot.nomi})")
+
+    def perform_update(self, serializer):
+        tashkilot = serializer.validated_data.get('tashkilot', serializer.instance.tashkilot)
+        check_scope_write(self.request, tashkilot.viloyat_id, tashkilot.tuman_id)
+        instance = serializer.save()
+        audit(self.request, 'hamkor_xodim_tahrirlash', f"Hamkor xodim tahrirlandi: {instance.fio} ({tashkilot.nomi})")
+
+    def perform_destroy(self, instance):
+        audit(self.request, 'hamkor_xodim_ochirish', f"Hamkor xodim o'chirildi: {instance.fio}")
+        instance.delete()
+
 
 # ── Kunlik ma'lumotnoma (arxiv) ───────────────────────────────────────────────
+def _arxiv_owner_tag(request):
+    """arxiv_yaratish uchun: fayl nomiga qo'shiladigan hudud yorlig'i (v<id>_t<id>)."""
+    role = request.user.role
+    if role == 'tuman':
+        return f"v{request.user.viloyat_id}_t{request.user.tuman_id}"
+    if role == 'viloyat':
+        return f"v{request.user.viloyat_id}_tall"
+    vid = request.GET.get('viloyat')
+    return f"v{vid}_tall" if vid else "vall_tall"
+
+def _arxiv_owner_match(filename, request):
+    """Fayl nomidagi yorliq so'rovchi hududiga tegishli ekanini tekshiradi.
+    Eski (yorliqsiz) fayllar faqat respublikaga ko'rinadi."""
+    role = request.user.role
+    if role == 'respublika':
+        return True
+    m = re.search(r'_v(\d+|all)_t(\d+|all)\.xlsx$', filename)
+    if not m:
+        return False
+    v_tag, t_tag = m.group(1), m.group(2)
+    if role == 'tuman':
+        return t_tag == str(request.user.tuman_id)
+    if role == 'viloyat':
+        return v_tag == str(request.user.viloyat_id)
+    return False
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def arxiv_list(request):
     folder = os.path.join(settings.MEDIA_ROOT, 'hisobot_arxiv')
     os.makedirs(folder, exist_ok=True)
     files = sorted([f for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))], reverse=True)
+    files = [f for f in files if _arxiv_owner_match(f, request)]
     result = []
     for f in files:
         mtime = os.path.getmtime(os.path.join(folder, f))
@@ -1204,17 +1357,18 @@ def arxiv_yaratish(request):
 
     folder   = os.path.join(settings.MEDIA_ROOT, 'hisobot_arxiv')
     os.makedirs(folder, exist_ok=True)
-    filename = f'hisobot_{today}_{int(datetime.now().timestamp())}.xlsx'
+    filename = f'hisobot_{today}_{int(datetime.now().timestamp())}_{_arxiv_owner_tag(request)}.xlsx'
     wb.save(os.path.join(folder, filename))
     return Response({'ok': True, 'filename': filename})
+
+_ARXIV_FNAME_RE = r'^hisobot_\d{4}-\d{2}-\d{2}_\d+(?:_v(?:\d+|all)_t(?:\d+|all))?\.xlsx$'
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsRespublika])
 def arxiv_ochir(request, id):
-    import re
     filename = os.path.basename(id)
-    # Faqat kutilgan format: hisobot_YYYY-MM-DD_timestamp.xlsx
-    if not re.match(r'^hisobot_\d{4}-\d{2}-\d{2}_\d+\.xlsx$', filename):
+    # Faqat kutilgan format: hisobot_YYYY-MM-DD_timestamp[_v<id>_t<id>].xlsx
+    if not re.match(_ARXIV_FNAME_RE, filename):
         return Response({'error': 'Noto\'g\'ri fayl nomi'}, status=400)
     path = os.path.join(settings.MEDIA_ROOT, 'hisobot_arxiv', filename)
     if os.path.exists(path):
@@ -1225,10 +1379,11 @@ def arxiv_ochir(request, id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def arxiv_download(request, id):
-    import re
     filename = os.path.basename(id)
-    if not re.match(r'^hisobot_\d{4}-\d{2}-\d{2}_\d+\.xlsx$', filename):
+    if not re.match(_ARXIV_FNAME_RE, filename):
         return Response({'error': 'Noto\'g\'ri fayl nomi'}, status=400)
+    if not _arxiv_owner_match(filename, request):
+        return Response({'error': "Ruxsat yo'q"}, status=403)
     path = os.path.join(settings.MEDIA_ROOT, 'hisobot_arxiv', filename)
     if not os.path.exists(path):
         return Response({'error': 'Fayl topilmadi'}, status=404)
@@ -4112,15 +4267,24 @@ def infratuzilma(request):
 def kunlik_ishlar_rasm(request):
     """POST /api/kunlik-ishlar/rasm/ — rasm yuklash"""
     import uuid as _uuid
+    from PIL import Image as PILImage
     f = request.FILES.get('rasm')
     if not f:
         return Response({'error': 'Rasm kerak'}, status=400)
-    ext      = f.name.rsplit('.', 1)[-1].lower()
-    fname    = f"ki_{_uuid.uuid4().hex[:12]}.{ext}"
-    fpath    = os.path.join(settings.MEDIA_ROOT, 'images', fname)
-    with open(fpath, 'wb') as out:
-        for chunk in f.chunks():
-            out.write(chunk)
+    MAX_BYTES = 15 * 1024 * 1024
+    if f.size > MAX_BYTES:
+        return Response({'error': "Fayl hajmi 15MB dan katta bo'lmasligi kerak"}, status=400)
+    try:
+        img = PILImage.open(f)
+        img.verify()
+        f.seek(0)
+        img = PILImage.open(f).convert('RGB')
+    except Exception:
+        return Response({'error': "Fayl haqiqiy rasm emas"}, status=400)
+    fname = f"ki_{_uuid.uuid4().hex[:12]}.jpg"
+    fpath = os.path.join(settings.MEDIA_ROOT, 'images', fname)
+    img.save(fpath, 'JPEG', quality=85)
+    audit(request, 'kunlik_ishlar_rasm_yuklash', f"Rasm yuklandi: {fname}")
     return Response({'url': fname})
 
 
