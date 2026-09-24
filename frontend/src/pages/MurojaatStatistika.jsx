@@ -262,7 +262,9 @@ export function MurojaatStatBlok({ data, loading }) {
             <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-45} textAnchor="end" height={80}/>
             <YAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }}/>
             <Tooltip formatter={(value, name) => name === 'zarar' ? [`${value.toLocaleString()} so'm`, 'Jami zarar'] : [value, 'Murojaatlar soni']}/>
-            <Bar dataKey="soni" fill="#4f46e5" radius={[4, 4, 0, 0]}/>
+            <Bar dataKey="soni" fill="#4f46e5" radius={[4, 4, 0, 0]}>
+              <LabelList dataKey="soni" position="top" style={{ fontSize: 11, fill: '#374151' }}/>
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
@@ -285,7 +287,7 @@ export function MurojaatStatBlok({ data, loading }) {
                   const total = usulPie.reduce((s, u) => s + u.value, 0)
                   const pct = total ? ((entry.payload.value / total) * 100).toFixed(0) : 0
                   const short = value.length > 28 ? value.slice(0, 28) + '…' : value
-                  return `${short} (${pct}%)`
+                  return `${short} — ${entry.payload.value} ta (${pct}%)`
                 }}
               />
             </PieChart>
@@ -312,7 +314,7 @@ export function MurojaatStatBlok({ data, loading }) {
           <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie data={jinsiPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                label={({ name, value, percent }) => `${name} ${value} ta (${(percent * 100).toFixed(0)}%)`}>
                 {jinsiPie.map((_, i) => <Cell key={i} fill={i === 0 ? '#4f46e5' : '#e11d48'}/>)}
               </Pie>
               <Tooltip/>
@@ -327,7 +329,9 @@ export function MurojaatStatBlok({ data, loading }) {
               <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={50}/>
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false}/>
               <Tooltip/>
-              <Bar dataKey="soni" fill="#0ea5e9" radius={[4, 4, 0, 0]}/>
+              <Bar dataKey="soni" fill="#0ea5e9" radius={[4, 4, 0, 0]}>
+                <LabelList dataKey="soni" position="top" style={{ fontSize: 11, fill: '#374151' }}/>
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
