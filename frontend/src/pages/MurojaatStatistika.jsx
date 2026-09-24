@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import api from '../api'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList,
 } from 'recharts'
 import { localDateStr, daysAgoStr } from '../utils/date'
 
@@ -294,24 +294,17 @@ export function MurojaatStatBlok({ data, loading }) {
 
         <ChartCard title="💼 Kasbi kesimida">
           <ResponsiveContainer width="100%" height={360}>
-            <PieChart>
-              <Pie data={kasbPie} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={80} labelLine={false}>
+            <BarChart data={kasbPie} layout="vertical" margin={{ top: 5, right: 35, left: 10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3"/>
+              <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }}/>
+              <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11 }}
+                tickFormatter={v => v.length > 22 ? v.slice(0, 22) + '…' : v}/>
+              <Tooltip formatter={(value) => [value, 'soni']}/>
+              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                 {kasbPie.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]}/>)}
-              </Pie>
-              <Tooltip formatter={(value, name) => [value, name]}/>
-              <Legend
-                wrapperStyle={{ fontSize: 10, lineHeight: '16px' }}
-                layout="vertical"
-                verticalAlign="bottom"
-                align="center"
-                formatter={(value, entry) => {
-                  const total = kasbPie.reduce((s, k) => s + k.value, 0)
-                  const pct = total ? ((entry.payload.value / total) * 100).toFixed(0) : 0
-                  const short = value.length > 28 ? value.slice(0, 28) + '…' : value
-                  return `${short} (${pct}%)`
-                }}
-              />
-            </PieChart>
+                <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151' }}/>
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
