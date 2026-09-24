@@ -942,6 +942,38 @@ def qamrov_nuqtalar(request):
     } for h in qs]
     return Response(data)
 
+# ── Kiber-tahlil ekrani uchun jonli oqim (rasm bilan, cheklovsiz) ──────────────
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def kiber_oqim(request):
+    """So'nggi tasdiqlangan targ'ibotlar (rasm bilan) — /kiber-analiz ekrani uchun.
+    tasdiqlangan/'dan farqi: respublika ham barcha hududlarni (is_viloyat cheklovisiz) ko'radi."""
+    start = request.GET.get('start', date.today().isoformat())
+    end   = request.GET.get('end',   date.today().isoformat())
+    vf    = get_viloyat_qs_filter(request)
+
+    qs = Hisobot.objects.filter(
+        status=2,
+        qushilgan_vaqt__date__gte=start,
+        qushilgan_vaqt__date__lte=end,
+        **vf
+    ).select_related('mahalla__tuman__viloyat').prefetch_related('rasmlar').order_by('-qushilgan_vaqt')[:40]
+
+    data = []
+    for h in qs:
+        rasm = h.rasmlar.all()[0] if h.rasmlar.all() else None
+        data.append({
+            'id':               h.id,
+            'rasm':             rasm.rasm_url if rasm else None,
+            'viloyat_nomi':     h.mahalla.tuman.viloyat.nomi if h.mahalla.tuman.viloyat_id else '',
+            'tuman_nomi':       h.mahalla.tuman.tuman_nomi,
+            'mahalla_nomi':     h.mahalla.mahalla_nomi,
+            'targibot_turi':    h.targibot_turi,
+            'qatnashchilar':    h.qatnashchilar_soni,
+            'vaqt':             h.qushilgan_vaqt.strftime('%H:%M'),
+        })
+    return Response(data)
+
 # ── Audit Log ─────────────────────────────────────────────────────────────────
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

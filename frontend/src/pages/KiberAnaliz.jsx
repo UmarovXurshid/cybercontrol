@@ -89,21 +89,20 @@ function FitBounds({ geoJson }) {
   return null
 }
 
-/* ── Uchib keluvchi karta (jonli GPS nuqtasi + manzil) ───────────────────── */
-function FlyingCard({ item, side }) {
+/* ── Oqim kartasi (kichik, rasm bilan, ro'yxatga qo'shiladi) ─────────────── */
+function FeedCard({ item }) {
   const online = item.targibot_turi === 2
   return (
-    <div
-      className={`fly-card fly-${side}`}
-      style={{ '--edge': side === 'left' ? '-340px' : '340px' }}
-    >
-      <div className="fly-card-inner">
-        <div className={`fly-card-icon ${online ? 'blue' : 'green'}`}>{online ? '🌐' : '📢'}</div>
-        <div className="fly-card-txt">
-          <div className="fly-card-viloyat">{online ? 'Online targ\'ibot' : 'Offline targ\'ibot'}</div>
-          <div className="fly-card-tuman">{item.tuman_nomi} · {item.mahalla_nomi}</div>
-          <div className="fly-card-meta">👥 {item.qatnashchilar || 0} kishi</div>
-        </div>
+    <div className="feed-card">
+      {item.rasm ? (
+        <img className="feed-thumb" src={`/media/images/${item.rasm}`} alt="" />
+      ) : (
+        <div className={`feed-thumb feed-thumb-icon ${online ? 'blue' : 'green'}`}>{online ? '🌐' : '📢'}</div>
+      )}
+      <div className="feed-txt">
+        <div className="feed-viloyat">{item.viloyat_nomi}</div>
+        <div className="feed-tuman">{item.tuman_nomi} · {item.mahalla_nomi}</div>
+        <div className="feed-meta">{item.vaqt} · 👥{item.qatnashchilar || 0}</div>
       </div>
     </div>
   )
@@ -120,10 +119,12 @@ export default function KiberAnaliz() {
   const [stat, setStat]         = useState(null)
   const [geoJson, setGeoJson]   = useState(null)
   const [hover, setHover]       = useState(null)
-  const [flying, setFlying]     = useState([])
+  const [feedL, setFeedL]       = useState([])
+  const [feedR, setFeedR]       = useState([])
 
-  const photoPoolRef = useRef([])
-  const flyIdxRef    = useRef(0)
+  const FEED_MAX = 7
+  const poolRef   = useRef([])
+  const idxRef    = useRef(0)
 
   const role = localStorage.getItem('role')
   const backTo = role === 'respublika' ? '/respublika' : role === 'tuman' ? '/tuman' : '/'
@@ -136,15 +137,14 @@ export default function KiberAnaliz() {
   /* Asosiy ma'lumotlar — yuklash + davriy yangilash (real vaqt hissi) */
   const loadAll = useCallback(async () => {
     try {
-      const [qRes, sRes, nRes] = await Promise.all([
+      const [qRes, sRes, fRes] = await Promise.all([
         api.get(`/qamrov/?start=${today}&end=${today}`),
         api.get(`/murojaat/statistika/?start=${today}&end=${today}`),
-        api.get(`/qamrov/nuqtalar/?start=${today}&end=${today}`),
+        api.get(`/kiber-oqim/?start=${today}&end=${today}`),
       ])
       setQamrov(qRes.data || [])
       setStat(sRes.data || null)
-      const pool = (nRes.data || [])
-      if (pool.length) photoPoolRef.current = pool
+      if ((fRes.data || []).length) poolRef.current = fRes.data
     } catch (_) {}
   }, [today])
 
@@ -154,21 +154,20 @@ export default function KiberAnaliz() {
     return () => clearInterval(t)
   }, [loadAll])
 
-  /* Uchib keluvchi kartalarni davriy chiqarish */
+  /* Oqim kartalarini davriy ravishda chapga/o'ngga qo'shib borish (yangisi tepada, eskisi pastga suriladi) */
   useEffect(() => {
     const spawn = () => {
-      const pool = photoPoolRef.current
+      const pool = poolRef.current
       if (!pool.length) return
-      const idx = flyIdxRef.current % pool.length
-      flyIdxRef.current += 1
+      const idx = idxRef.current % pool.length
+      idxRef.current += 1
       const base = pool[idx]
-      const side = flyIdxRef.current % 2 === 0 ? 'left' : 'right'
-      const uid = `${base.id}-${Date.now()}`
-      setFlying(f => [...f.slice(-3), { ...base, uid, side }])
-      setTimeout(() => setFlying(f => f.filter(x => x.uid !== uid)), 7000)
+      const uid = `${base.id}-${idxRef.current}`
+      const setSide = idxRef.current % 2 === 0 ? setFeedL : setFeedR
+      setSide(list => [{ ...base, uid }, ...list].slice(0, FEED_MAX))
     }
-    const t = setInterval(spawn, 4500)
-    const t0 = setTimeout(spawn, 1500)
+    const t = setInterval(spawn, 3200)
+    const t0 = setTimeout(spawn, 1200)
     return () => { clearInterval(t); clearTimeout(t0) }
   }, [])
 
@@ -322,9 +321,12 @@ export default function KiberAnaliz() {
         )}
       </div>
 
-      {/* Uchib o'tuvchi isbot rasmlari */}
-      <div className="kiber-fly-zone">
-        {flying.map(f => <FlyingCard key={f.uid} item={f} side={f.side} />)}
+      {/* Jonli oqim — targ'ibot bo'lgan joydan chiqib, kichik ro'yxatga to'planadi */}
+      <div className="kiber-feed kiber-feed-left">
+        {feedL.map(f => <FeedCard key={f.uid} item={f}/>)}
+      </div>
+      <div className="kiber-feed kiber-feed-right">
+        {feedR.map(f => <FeedCard key={f.uid} item={f}/>)}
       </div>
 
       <footer className="kiber-footer">
@@ -439,41 +441,36 @@ const CSS = `
 .kiber-hover-row { font-size: 11px; color: #cdeaff; display: flex; gap: 10px; justify-content: space-between; }
 .kiber-hover-row b { color: #22e6ff; }
 
-.kiber-fly-zone { position: absolute; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
-.fly-card { position: absolute; top: 22%; animation: fly-move 7s linear forwards; }
-.fly-left  { left: var(--edge); animation-name: fly-in-left; }
-.fly-right { right: var(--edge); animation-name: fly-in-right; }
-@keyframes fly-in-left {
-  0%   { transform: translateX(0) translateY(0); opacity: 0; }
-  8%   { opacity: 1; }
-  45%  { transform: translateX(420px) translateY(40vh); opacity: 1; }
-  85%  { opacity: 1; }
-  100% { transform: translateX(460px) translateY(55vh); opacity: 0; }
+.kiber-feed {
+  position: absolute; top: 150px; bottom: 60px; width: 208px; z-index: 6;
+  display: flex; flex-direction: column; gap: 7px; overflow: hidden; pointer-events: none;
 }
-@keyframes fly-in-right {
-  0%   { transform: translateX(0) translateY(0); opacity: 0; }
-  8%   { opacity: 1; }
-  45%  { transform: translateX(-420px) translateY(45vh); opacity: 1; }
-  85%  { opacity: 1; }
-  100% { transform: translateX(-460px) translateY(60vh); opacity: 0; }
+.kiber-feed-left  { left: 336px; }
+.kiber-feed-right { right: 336px; }
+.feed-card {
+  display: flex; gap: 8px; align-items: center; padding: 6px; border-radius: 8px;
+  background: rgba(4,22,36,0.85); border: 1px solid rgba(34,230,255,0.3);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+  animation: feed-in .45s cubic-bezier(.2,.8,.3,1) both;
 }
-.fly-card-inner {
-  width: 168px; background: rgba(4,22,36,0.92); border: 1px solid rgba(34,230,255,0.4);
-  border-radius: 10px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 18px rgba(34,230,255,0.25);
-}
-.fly-card-icon { width: 100%; height: 64px; display: flex; align-items: center; justify-content: center; font-size: 28px; }
-.fly-card-icon.green { background: radial-gradient(circle, rgba(57,255,138,0.25), rgba(57,255,138,0.04)); }
-.fly-card-icon.blue  { background: radial-gradient(circle, rgba(34,230,255,0.25), rgba(34,230,255,0.04)); }
-.fly-card-txt { padding: 7px 9px; }
-.fly-card-viloyat { font-size: 10.5px; color: #39ff8a; font-weight: bold; letter-spacing: 0.02em; }
-.fly-card-tuman { font-size: 9.5px; color: #9fc9e0; margin-top: 2px; line-height: 1.3; }
-.fly-card-meta { font-size: 9px; color: #6fa8c9; margin-top: 3px; }
+@keyframes feed-in { from { opacity: 0; transform: translateY(-14px) scale(0.92); } to { opacity: 1; transform: none; } }
+.feed-thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.feed-thumb-icon { display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.feed-thumb-icon.green { background: radial-gradient(circle, rgba(57,255,138,0.3), rgba(57,255,138,0.05)); }
+.feed-thumb-icon.blue  { background: radial-gradient(circle, rgba(34,230,255,0.3), rgba(34,230,255,0.05)); }
+.feed-txt { min-width: 0; }
+.feed-viloyat { font-size: 9.5px; color: #39ff8a; font-weight: bold; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feed-tuman { font-size: 9px; color: #9fc9e0; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feed-meta { font-size: 8.5px; color: #6fa8c9; margin-top: 1px; }
 
 .kiber-footer {
   position: absolute; bottom: 14px; left: 0; right: 0; text-align: center;
   font-size: 10px; color: #3f6d87; letter-spacing: 0.05em; z-index: 5;
 }
 
+@media (max-width: 1300px) {
+  .kiber-feed { display: none; }
+}
 @media (max-width: 900px) {
   .kiber-panel { display: none; }
   .kiber-map-tilt { width: 90vw; height: 50vh; }

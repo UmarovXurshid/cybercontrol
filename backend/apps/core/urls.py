@@ -42,6 +42,7 @@ urlpatterns = [
     path('compress-images/',           views.compress_images_view),
     path('qamrov/',                    views.qamrov),
     path('qamrov/nuqtalar/',           views.qamrov_nuqtalar),
+    path('kiber-oqim/',                views.kiber_oqim),
 
     # Arxiv
     path('arxiv/',                              views.arxiv_list),
