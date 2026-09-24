@@ -488,6 +488,11 @@ const CSS = `
   background: transparent;
   position: relative; z-index: 2;
 }
+.kiber-map-plain .leaflet-container,
+.kiber-map-plain .leaflet-pane,
+.kiber-map-plain .leaflet-tile-pane {
+  background: transparent !important;
+}
 .kiber-radar {
   position: absolute; z-index: 1; pointer-events: none;
   top: 50%; left: 50%;
