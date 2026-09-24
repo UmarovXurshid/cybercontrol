@@ -108,6 +108,15 @@ function FeedCard({ item }) {
   )
 }
 
+/* ── Xaritadan chetga uchib o'tuvchi vaqtinchalik karta ───────────────────── */
+function LaunchCard({ item, side }) {
+  return (
+    <div className={`launch-card launch-${side}`}>
+      <FeedCard item={item}/>
+    </div>
+  )
+}
+
 /* ════════════════════════════════════════════════════════════════════════════
    ASOSIY SAHIFA
 ═══════════════════════════════════════════════════════════════════════════ */
@@ -121,6 +130,7 @@ export default function KiberAnaliz() {
   const [hover, setHover]       = useState(null)
   const [feedL, setFeedL]       = useState([])
   const [feedR, setFeedR]       = useState([])
+  const [launching, setLaunching] = useState([])
 
   const FEED_MAX = 7
   const poolRef   = useRef([])
@@ -154,7 +164,8 @@ export default function KiberAnaliz() {
     return () => clearInterval(t)
   }, [loadAll])
 
-  /* Oqim kartalarini davriy ravishda chapga/o'ngga qo'shib borish (yangisi tepada, eskisi pastga suriladi) */
+  /* Karta xaritadan "chiqib" chetga uchib boradi, so'ng doimiy ro'yxatga qo'shiladi
+     (yangisi tepada, eskisi pastga suriladi) */
   useEffect(() => {
     const spawn = () => {
       const pool = poolRef.current
@@ -163,8 +174,13 @@ export default function KiberAnaliz() {
       idxRef.current += 1
       const base = pool[idx]
       const uid = `${base.id}-${idxRef.current}`
-      const setSide = idxRef.current % 2 === 0 ? setFeedL : setFeedR
-      setSide(list => [{ ...base, uid }, ...list].slice(0, FEED_MAX))
+      const side = idxRef.current % 2 === 0 ? 'left' : 'right'
+      setLaunching(l => [...l, { ...base, uid, side }])
+      setTimeout(() => {
+        setLaunching(l => l.filter(x => x.uid !== uid))
+        const setSide = side === 'left' ? setFeedL : setFeedR
+        setSide(list => [{ ...base, uid }, ...list].slice(0, FEED_MAX))
+      }, 950)
     }
     const t = setInterval(spawn, 3200)
     const t0 = setTimeout(spawn, 1200)
@@ -321,6 +337,9 @@ export default function KiberAnaliz() {
         )}
       </div>
 
+      {/* Xaritadan chiqib chetga uchib o'tayotgan kartalar */}
+      {launching.map(f => <LaunchCard key={f.uid} item={f} side={f.side}/>)}
+
       {/* Jonli oqim — targ'ibot bo'lgan joydan chiqib, kichik ro'yxatga to'planadi */}
       <div className="kiber-feed kiber-feed-left">
         {feedL.map(f => <FeedCard key={f.uid} item={f}/>)}
@@ -422,15 +441,22 @@ const CSS = `
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   padding-top: 60px;
 }
-.kiber-map-tilt { perspective: 1400px; width: min(760px, 62vw); height: min(560px, 68vh); }
+.kiber-map-tilt { perspective: 1600px; width: min(920px, calc(100vw - 1150px)); height: min(700px, 78vh); }
 .kiber-map-inner {
-  width: 100%; height: 100%; border-radius: 16px; overflow: hidden;
-  transform: rotateX(18deg) scale(0.98);
+  width: 100%; height: 100%; border-radius: 20px; overflow: hidden;
+  transform: rotateX(16deg) scale(0.97);
   transform-style: preserve-3d;
-  box-shadow: 0 40px 90px rgba(0,0,0,0.65), 0 0 60px rgba(34,230,255,0.12), inset 0 0 0 1px rgba(34,230,255,0.25);
-  transition: transform .4s ease;
+  box-shadow: 0 50px 110px rgba(0,0,0,0.7), 0 0 90px rgba(34,230,255,0.18), inset 0 0 0 1px rgba(34,230,255,0.35);
+  transition: transform .4s ease, box-shadow .4s ease;
+  position: relative;
 }
-.kiber-map-tilt:hover .kiber-map-inner { transform: rotateX(9deg) scale(1); }
+.kiber-map-inner::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: 20px;
+  background: linear-gradient(160deg, rgba(34,230,255,0.10), transparent 30%, transparent 70%, rgba(57,255,138,0.10));
+  animation: kiber-sheen 6s ease-in-out infinite;
+}
+@keyframes kiber-sheen { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+.kiber-map-tilt:hover .kiber-map-inner { transform: rotateX(7deg) scale(1); box-shadow: 0 55px 120px rgba(0,0,0,0.75), 0 0 120px rgba(34,230,255,0.28), inset 0 0 0 1px rgba(34,230,255,0.5); }
 
 .kiber-hover-card {
   position: absolute; top: 68px; left: 50%; transform: translateX(-50%); z-index: 8;
@@ -462,6 +488,25 @@ const CSS = `
 .feed-viloyat { font-size: 9.5px; color: #39ff8a; font-weight: bold; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .feed-tuman { font-size: 9px; color: #9fc9e0; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .feed-meta { font-size: 8.5px; color: #6fa8c9; margin-top: 1px; }
+
+.launch-card {
+  position: absolute; z-index: 15; pointer-events: none; width: 208px;
+  left: 50%; top: 52%; transform: translate(-50%, -50%) scale(1.6);
+  opacity: 0;
+}
+.launch-card .feed-card { animation: none; box-shadow: 0 0 30px rgba(34,230,255,0.5), 0 12px 30px rgba(0,0,0,0.5); }
+.launch-left  { animation: launch-left .95s cubic-bezier(.22,.7,.25,1) forwards; }
+.launch-right { animation: launch-right .95s cubic-bezier(.22,.7,.25,1) forwards; }
+@keyframes launch-left {
+  0%   { left: 50%; top: 52%; transform: translate(-50%,-50%) scale(1.6); opacity: 0; }
+  18%  { opacity: 1; transform: translate(-50%,-50%) scale(1.6); }
+  100% { left: 336px; top: 150px; transform: translate(0,0) scale(1); opacity: 1; }
+}
+@keyframes launch-right {
+  0%   { left: 50%; top: 52%; transform: translate(-50%,-50%) scale(1.6); opacity: 0; }
+  18%  { opacity: 1; transform: translate(-50%,-50%) scale(1.6); }
+  100% { left: calc(100% - 544px); top: 150px; transform: translate(0,0) scale(1); opacity: 1; }
+}
 
 .kiber-footer {
   position: absolute; bottom: 14px; left: 0; right: 0; text-align: center;
