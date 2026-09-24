@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, GeoJSON, useMap, CircleMarker } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import api from '../api'
@@ -89,6 +89,13 @@ function FitBounds({ geoJson }) {
   return null
 }
 
+/* ── Xarita instansiyasini ota komponentga uzatish (koordinata hisoblash uchun) */
+function MapRefGrabber({ onReady }) {
+  const map = useMap()
+  useEffect(() => { onReady(map) }, [map, onReady])
+  return null
+}
+
 /* ── Oqim kartasi (kichik, rasm bilan, ro'yxatga qo'shiladi) ─────────────── */
 function FeedCard({ item }) {
   const online = item.targibot_turi === 2
@@ -109,11 +116,20 @@ function FeedCard({ item }) {
 }
 
 /* ── Xaritadan chetga uchib o'tuvchi vaqtinchalik karta ───────────────────── */
-function LaunchCard({ item, side }) {
+function LaunchCard({ item, side, sx, sy }) {
+  const style = sx != null ? { '--sx': `${sx}px`, '--sy': `${sy}px` } : undefined
   return (
-    <div className={`launch-card launch-${side}`}>
+    <div className={`launch-card launch-${side}`} style={style}>
       <FeedCard item={item}/>
     </div>
+  )
+}
+
+/* ── Xaritada targ'ibot nuqtasidan chiquvchi kichik pulslash belgisi ────────── */
+function MapPulse({ lat, lng }) {
+  return (
+    <CircleMarker center={[lat, lng]} radius={7}
+      pathOptions={{ className: 'map-pulse', color: '#39ff8a', weight: 2, fillColor: '#39ff8a', fillOpacity: 0.5 }}/>
   )
 }
 
@@ -131,10 +147,13 @@ export default function KiberAnaliz() {
   const [feedL, setFeedL]       = useState([])
   const [feedR, setFeedR]       = useState([])
   const [launching, setLaunching] = useState([])
+  const [pulses, setPulses]     = useState([])
 
   const FEED_MAX = 7
   const poolRef   = useRef([])
   const idxRef    = useRef(0)
+  const mapObjRef = useRef(null)
+  const mapDivRef = useRef(null)
 
   const role = localStorage.getItem('role')
   const backTo = role === 'respublika' ? '/respublika' : role === 'tuman' ? '/tuman' : '/'
@@ -175,7 +194,21 @@ export default function KiberAnaliz() {
       const base = pool[idx]
       const uid = `${base.id}-${idxRef.current}`
       const side = idxRef.current % 2 === 0 ? 'left' : 'right'
-      setLaunching(l => [...l, { ...base, uid, side }])
+
+      // Agar hisobotda GPS bo'lsa — aynan o'sha nuqtadan chiqqandek ko'rsatamiz
+      let sx = null, sy = null
+      if (base.lat != null && base.lng != null && mapObjRef.current && mapDivRef.current) {
+        try {
+          const pt = mapObjRef.current.latLngToContainerPoint([base.lat, base.lng])
+          const rect = mapDivRef.current.getBoundingClientRect()
+          sx = rect.left + pt.x
+          sy = rect.top + pt.y
+          setPulses(p => [...p, { uid, lat: base.lat, lng: base.lng }])
+          setTimeout(() => setPulses(p => p.filter(x => x.uid !== uid)), 1400)
+        } catch (_) {}
+      }
+
+      setLaunching(l => [...l, { ...base, uid, side, sx, sy }])
       setTimeout(() => {
         setLaunching(l => l.filter(x => x.uid !== uid))
         const setSide = side === 'left' ? setFeedL : setFeedR
@@ -302,30 +335,30 @@ export default function KiberAnaliz() {
         {!stat && <div className="kiber-loading">Yuklanmoqda…</div>}
       </aside>
 
-      {/* Markaz — 3D holografik xarita */}
+      {/* Markaz — xarita */}
       <div className="kiber-map-wrap">
-        <div className="kiber-map-tilt">
-          <div className="kiber-map-inner">
-            <MapContainer
-              center={[41.6, 64.0]}
-              zoom={6}
-              style={{ height: '100%', width: '100%', background: 'transparent' }}
-              zoomControl={false}
-              attributionControl={false}
-              scrollWheelZoom={true}
-              dragging={true}
-            >
-              <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png"
-                subdomains="abcd"
-                maxZoom={19}
-              />
-              {geoJson && (
-                <GeoJSON key="kiber-geo" data={geoJson} style={style} onEachFeature={onEachFeature} />
-              )}
-              {geoJson && <FitBounds geoJson={geoJson} />}
-            </MapContainer>
-          </div>
+        <div className="kiber-map-plain" ref={mapDivRef}>
+          <MapContainer
+            center={[41.6, 64.0]}
+            zoom={6}
+            style={{ height: '100%', width: '100%', background: 'transparent' }}
+            zoomControl={false}
+            attributionControl={false}
+            scrollWheelZoom={true}
+            dragging={true}
+          >
+            <TileLayer
+              url="https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png"
+              subdomains="abcd"
+              maxZoom={19}
+            />
+            {geoJson && (
+              <GeoJSON key="kiber-geo" data={geoJson} style={style} onEachFeature={onEachFeature} />
+            )}
+            {geoJson && <FitBounds geoJson={geoJson} />}
+            <MapRefGrabber onReady={m => { mapObjRef.current = m }}/>
+            {pulses.map(p => <MapPulse key={p.uid} lat={p.lat} lng={p.lng}/>)}
+          </MapContainer>
         </div>
 
         {hover && (
@@ -338,7 +371,7 @@ export default function KiberAnaliz() {
       </div>
 
       {/* Xaritadan chiqib chetga uchib o'tayotgan kartalar */}
-      {launching.map(f => <LaunchCard key={f.uid} item={f} side={f.side}/>)}
+      {launching.map(f => <LaunchCard key={f.uid} item={f} side={f.side} sx={f.sx} sy={f.sy}/>)}
 
       {/* Jonli oqim — targ'ibot bo'lgan joydan chiqib, kichik ro'yxatga to'planadi */}
       <div className="kiber-feed kiber-feed-left">
@@ -439,24 +472,18 @@ const CSS = `
 
 .kiber-map-wrap {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  padding-top: 60px;
+  padding-top: 40px;
 }
-.kiber-map-tilt { perspective: 1600px; width: min(920px, calc(100vw - 1150px)); height: min(700px, 78vh); }
-.kiber-map-inner {
-  width: 100%; height: 100%; border-radius: 20px; overflow: hidden;
-  transform: rotateX(16deg) scale(0.97);
-  transform-style: preserve-3d;
-  box-shadow: 0 50px 110px rgba(0,0,0,0.7), 0 0 90px rgba(34,230,255,0.18), inset 0 0 0 1px rgba(34,230,255,0.35);
-  transition: transform .4s ease, box-shadow .4s ease;
-  position: relative;
+.kiber-map-plain {
+  width: min(1180px, calc(100vw - 1100px));
+  height: min(820px, 84vh);
+  background: transparent;
 }
-.kiber-map-inner::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: 20px;
-  background: linear-gradient(160deg, rgba(34,230,255,0.10), transparent 30%, transparent 70%, rgba(57,255,138,0.10));
-  animation: kiber-sheen 6s ease-in-out infinite;
+.map-pulse { animation: map-pulse-anim 1.4s ease-out forwards; }
+@keyframes map-pulse-anim {
+  0%   { r: 4; opacity: 1; }
+  100% { r: 22; opacity: 0; }
 }
-@keyframes kiber-sheen { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
-.kiber-map-tilt:hover .kiber-map-inner { transform: rotateX(7deg) scale(1); box-shadow: 0 55px 120px rgba(0,0,0,0.75), 0 0 120px rgba(34,230,255,0.28), inset 0 0 0 1px rgba(34,230,255,0.5); }
 
 .kiber-hover-card {
   position: absolute; top: 68px; left: 50%; transform: translateX(-50%); z-index: 8;
@@ -491,20 +518,20 @@ const CSS = `
 
 .launch-card {
   position: absolute; z-index: 15; pointer-events: none; width: 208px;
-  left: 50%; top: 52%; transform: translate(-50%, -50%) scale(1.6);
+  left: var(--sx, 50%); top: var(--sy, 52%); transform: translate(-50%, -50%) scale(0.35);
   opacity: 0;
 }
 .launch-card .feed-card { animation: none; box-shadow: 0 0 30px rgba(34,230,255,0.5), 0 12px 30px rgba(0,0,0,0.5); }
 .launch-left  { animation: launch-left .95s cubic-bezier(.22,.7,.25,1) forwards; }
 .launch-right { animation: launch-right .95s cubic-bezier(.22,.7,.25,1) forwards; }
 @keyframes launch-left {
-  0%   { left: 50%; top: 52%; transform: translate(-50%,-50%) scale(1.6); opacity: 0; }
-  18%  { opacity: 1; transform: translate(-50%,-50%) scale(1.6); }
+  0%   { left: var(--sx, 50%); top: var(--sy, 52%); transform: translate(-50%,-50%) scale(0.3); opacity: 0; }
+  18%  { opacity: 1; transform: translate(-50%,-50%) scale(0.9); }
   100% { left: 336px; top: 150px; transform: translate(0,0) scale(1); opacity: 1; }
 }
 @keyframes launch-right {
-  0%   { left: 50%; top: 52%; transform: translate(-50%,-50%) scale(1.6); opacity: 0; }
-  18%  { opacity: 1; transform: translate(-50%,-50%) scale(1.6); }
+  0%   { left: var(--sx, 50%); top: var(--sy, 52%); transform: translate(-50%,-50%) scale(0.3); opacity: 0; }
+  18%  { opacity: 1; transform: translate(-50%,-50%) scale(0.9); }
   100% { left: calc(100% - 544px); top: 150px; transform: translate(0,0) scale(1); opacity: 1; }
 }
 
@@ -518,6 +545,6 @@ const CSS = `
 }
 @media (max-width: 900px) {
   .kiber-panel { display: none; }
-  .kiber-map-tilt { width: 90vw; height: 50vh; }
+  .kiber-map-plain { width: 90vw; height: 50vh; }
 }
 `

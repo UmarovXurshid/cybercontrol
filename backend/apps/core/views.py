@@ -971,6 +971,8 @@ def kiber_oqim(request):
             'targibot_turi':    h.targibot_turi,
             'qatnashchilar':    h.qatnashchilar_soni,
             'vaqt':             h.qushilgan_vaqt.strftime('%H:%M'),
+            'lat':              h.latitude,
+            'lng':              h.longitude,
         })
     return Response(data)
 
