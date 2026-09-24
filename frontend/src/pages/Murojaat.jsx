@@ -535,7 +535,7 @@ export default function Murojaat() {
     if (f.end)        params.append('end', f.end)
     if (f.viloyat_id) params.append('viloyat_id', f.viloyat_id)
     if (f.tuman_id)   params.append('tuman_id', f.tuman_id)
-    (f.kasb_ids || []).forEach(id => params.append('kasb_id', id))
+    for (const id of (f.kasb_ids || [])) params.append('kasb_id', id)
     if (f.usul_id)    params.append('usul_id', f.usul_id)
     if (f.yosh_min)   params.append('yosh_min', f.yosh_min)
     if (f.yosh_max)   params.append('yosh_max', f.yosh_max)
