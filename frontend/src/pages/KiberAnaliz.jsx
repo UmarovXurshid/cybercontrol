@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { MapContainer, TileLayer, GeoJSON, useMap, CircleMarker } from 'react-leaflet'
+import { MapContainer, GeoJSON, useMap, CircleMarker } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import api from '../api'
@@ -335,8 +335,9 @@ export default function KiberAnaliz() {
         {!stat && <div className="kiber-loading">Yuklanmoqda…</div>}
       </aside>
 
-      {/* Markaz — xarita */}
+      {/* Markaz — xarita (romkasiz, faqat hudud chegaralari, fon bilan qorishib ketadi) */}
       <div className="kiber-map-wrap">
+        <div className="kiber-radar" />
         <div className="kiber-map-plain" ref={mapDivRef}>
           <MapContainer
             center={[41.6, 64.0]}
@@ -347,11 +348,6 @@ export default function KiberAnaliz() {
             scrollWheelZoom={true}
             dragging={true}
           >
-            <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png"
-              subdomains="abcd"
-              maxZoom={19}
-            />
             {geoJson && (
               <GeoJSON key="kiber-geo" data={geoJson} style={style} onEachFeature={onEachFeature} />
             )}
@@ -478,7 +474,21 @@ const CSS = `
   width: min(1180px, calc(100vw - 1100px));
   height: min(820px, 84vh);
   background: transparent;
+  position: relative; z-index: 2;
 }
+.kiber-radar {
+  position: absolute; z-index: 1; pointer-events: none;
+  top: 50%; left: 50%;
+  width: min(1300px, calc(100vw - 950px)); height: min(1300px, calc(100vw - 950px));
+  max-height: 100vh;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(57,255,138,0.22), transparent 22%, transparent 100%);
+  animation: kiber-radar-spin 6s linear infinite;
+  -webkit-mask-image: radial-gradient(circle, black 0%, black 55%, transparent 78%);
+          mask-image: radial-gradient(circle, black 0%, black 55%, transparent 78%);
+}
+@keyframes kiber-radar-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
 .map-pulse { animation: map-pulse-anim 1.4s ease-out forwards; }
 @keyframes map-pulse-anim {
   0%   { r: 4; opacity: 1; }
