@@ -2501,7 +2501,7 @@ def murojaat_list_create(request):
         end     = request.GET.get('end')
         viloyat = request.GET.get('viloyat_id')
         tuman   = request.GET.get('tuman_id')
-        kasb    = request.GET.get('kasb_id')
+        kasb_ids = request.GET.getlist('kasb_id')
         usul    = request.GET.get('usul_id')
         yosh_min = request.GET.get('yosh_min')
         yosh_max = request.GET.get('yosh_max')
@@ -2514,8 +2514,8 @@ def murojaat_list_create(request):
             qs = qs.filter(viloyat_id=viloyat)
         if tuman:
             qs = qs.filter(tuman_id=tuman)
-        if kasb:
-            qs = qs.filter(Q(kasb_id=kasb) | Q(kasb__ota_id=kasb))
+        if kasb_ids:
+            qs = qs.filter(Q(kasb_id__in=kasb_ids) | Q(kasb__ota_id__in=kasb_ids))
         if usul:
             qs = qs.filter(Q(usul_id=usul) | Q(usul__ota_id=usul))
         if yosh_min:
@@ -3332,7 +3332,7 @@ def murojaat_statistika(request):
     end     = request.GET.get('end')
     viloyat = request.GET.get('viloyat_id')
     tuman   = request.GET.get('tuman_id')
-    kasb    = request.GET.get('kasb_id')
+    kasb_ids = request.GET.getlist('kasb_id')
     usul    = request.GET.get('usul_id')
     yosh_min = request.GET.get('yosh_min')
     yosh_max = request.GET.get('yosh_max')
@@ -3346,8 +3346,8 @@ def murojaat_statistika(request):
         qs = qs.filter(viloyat_id=viloyat)
     if tuman:
         qs = qs.filter(tuman_id=tuman)
-    if kasb:
-        qs = qs.filter(Q(kasb_id=kasb) | Q(kasb__ota_id=kasb))
+    if kasb_ids:
+        qs = qs.filter(Q(kasb_id__in=kasb_ids) | Q(kasb__ota_id__in=kasb_ids))
     if usul:
         qs = qs.filter(Q(usul_id=usul) | Q(usul__ota_id=usul))
     if yosh_min:

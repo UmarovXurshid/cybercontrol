@@ -129,6 +129,49 @@ function UsulSelector({ usullar, value, onChange }) {
   )
 }
 
+// ── Filtr uchun bir nechta band tanlash (checkbox ro'yxat) ─────────────────────
+function MultiSelectDropdown({ options, selected, onChange, width = 'w-56' }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef()
+  useEffect(() => {
+    const onClick = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+  const toggle = (id) => {
+    const idStr = String(id)
+    onChange(selected.includes(idStr) ? selected.filter(x => x !== idStr) : [...selected, idStr])
+  }
+  const summary = selected.length === 0
+    ? 'Barchasi'
+    : selected.length === 1
+      ? (options.find(o => String(o.id) === selected[0])?.label.trim() || '1 ta tanlangan')
+      : `${selected.length} ta tanlangan`
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className={`input-field ${width} text-left flex items-center justify-between gap-1`}>
+        <span className="truncate">{summary}</span>
+        <span className="text-gray-400 shrink-0">▾</span>
+      </button>
+      {open && (
+        <div className={`absolute z-20 mt-1 ${width} max-h-72 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg`}>
+          <label className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 text-sm border-b cursor-pointer">
+            <input type="checkbox" checked={selected.length === 0} onChange={() => onChange([])}/>
+            <span>Barchasi</span>
+          </label>
+          {options.map(o => (
+            <label key={o.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 text-sm whitespace-pre cursor-pointer">
+              <input type="checkbox" checked={selected.includes(String(o.id))} onChange={() => toggle(o.id)}/>
+              <span>{o.label}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Kasb kaskad tanlash ───────────────────────────────────────────────────────
 function KasbSelector({ kasblar, value, onChange, izoh, onIzoh, muassasa, onMuassasa, kurs, onKurs }) {
   const [sel1, setSel1] = useState('')
@@ -436,7 +479,7 @@ export default function Murojaat() {
   const [formVersion, setFormVersion] = useState(0)
   const [editId,    setEditId]    = useState(null)
   const [loading,   setLoading]   = useState(false)
-  const [filter,    setFilter]    = useState({ start: '', end: '', viloyat_id: '', tuman_id: '', kasb_id: '', usul_id: '', yosh_min: '', yosh_max: '' })
+  const [filter,    setFilter]    = useState({ start: '', end: '', viloyat_id: '', tuman_id: '', kasb_ids: [], usul_id: '', yosh_min: '', yosh_max: '' })
   const [exporting, setExporting] = useState(false)
   const [korishObj, setKorishObj] = useState(null)
   const [fishMatch, setFishMatch] = useState({ topildi: false, natijalar: [] })
@@ -492,7 +535,7 @@ export default function Murojaat() {
     if (f.end)        params.append('end', f.end)
     if (f.viloyat_id) params.append('viloyat_id', f.viloyat_id)
     if (f.tuman_id)   params.append('tuman_id', f.tuman_id)
-    if (f.kasb_id)    params.append('kasb_id', f.kasb_id)
+    (f.kasb_ids || []).forEach(id => params.append('kasb_id', id))
     if (f.usul_id)    params.append('usul_id', f.usul_id)
     if (f.yosh_min)   params.append('yosh_min', f.yosh_min)
     if (f.yosh_max)   params.append('yosh_max', f.yosh_max)
@@ -820,11 +863,8 @@ export default function Murojaat() {
         </div>
         <div>
           <label className="form-label">Kasb</label>
-          <select value={filter.kasb_id}
-            onChange={e => setFilter(p => ({ ...p, kasb_id: e.target.value }))} className="input-field w-56">
-            <option value="">Barchasi</option>
-            {kasbFilterOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-          </select>
+          <MultiSelectDropdown options={kasbFilterOptions} selected={filter.kasb_ids}
+            onChange={ids => setFilter(p => ({ ...p, kasb_ids: ids }))}/>
         </div>
         <div>
           <label className="form-label">Sodir etish usuli</label>
@@ -845,7 +885,7 @@ export default function Murojaat() {
             onChange={e => setFilter(p => ({ ...p, yosh_max: e.target.value }))} className="input-field w-24"/>
         </div>
         <button onClick={() => qidirish(filter)} className="btn-primary">🔍 Qidirish</button>
-        <button onClick={() => { const f = { start:'', end:'', viloyat_id:'', tuman_id:'', kasb_id:'', usul_id:'', yosh_min:'', yosh_max:'' }; setFilter(f); qidirish(f) }}
+        <button onClick={() => { const f = { start:'', end:'', viloyat_id:'', tuman_id:'', kasb_ids:[], usul_id:'', yosh_min:'', yosh_max:'' }; setFilter(f); qidirish(f) }}
           className="px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
           ✕ Tozalash
         </button>
