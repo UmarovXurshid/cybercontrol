@@ -524,7 +524,7 @@ const CSS = `
 .kiber-kpi-top { font-size: 17px; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: kiber-pulse-slow 2.4s ease-in-out infinite; }
 @keyframes kiber-pulse-slow { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 
-.kiber-gauge-corner { position: absolute; top: 92px; right: 24px; z-index: 5; }
+.kiber-gauge-corner { position: absolute; top: 8px; right: 380px; z-index: 7; }
 .gauge { text-align: center; }
 .gauge-val { font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: 700; margin-top: -34px; }
 .gauge-lbl { font-size: 9px; color: #6fa8c9; letter-spacing: 0.06em; margin-top: 2px; }
@@ -655,6 +655,7 @@ const CSS = `
 
 @media (max-width: 1300px) {
   .kiber-feed { display: none; }
+  .kiber-gauge-corner { display: none; }
 }
 @media (max-width: 900px) {
   .kiber-panel { display: none; }
