@@ -3398,6 +3398,28 @@ def murojaat_statistika(request):
         key=lambda x: -x['soni']
     )
 
+    # ── Kasbi kesimida (asosiy (ota) kategoriyaga yig'ib) ──────────────────────
+    kasb_map = {k.id: k for k in MurojaatKasb.objects.all()}
+    def root_kasb_nomi(kid):
+        k = kasb_map.get(kid)
+        depth = 0
+        while k and k.ota_id and depth < 10:
+            k = kasb_map.get(k.ota_id)
+            depth += 1
+        return k.nomi if k else "Noma'lum"
+
+    kasb_counts = {}
+    for row in qs.exclude(kasb_id__isnull=True).values('kasb_id').annotate(soni=Count('id')):
+        nomi = root_kasb_nomi(row['kasb_id'])
+        kasb_counts[nomi] = kasb_counts.get(nomi, 0) + row['soni']
+    noma_kasb = qs.filter(kasb_id__isnull=True).count()
+    if noma_kasb:
+        kasb_counts["Noma'lum"] = kasb_counts.get("Noma'lum", 0) + noma_kasb
+    kasb_stat = sorted(
+        [{'nomi': k, 'soni': v} for k, v in kasb_counts.items()],
+        key=lambda x: -x['soni']
+    )
+
     # ── Jinsi kesimida ─────────────────────────────────────────────────────────
     jinsi_nomlari = dict(Murojaat.JINSI)
     jinsi_stat = [
@@ -3424,6 +3446,7 @@ def murojaat_statistika(request):
     return Response({
         'viloyatlar': viloyatlar,
         'usul_stat':  usul_stat,
+        'kasb_stat':  kasb_stat,
         'jinsi_stat': jinsi_stat,
         'yosh_stat':  yosh_stat,
         'jami':       qs.count(),

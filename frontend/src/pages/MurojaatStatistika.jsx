@@ -200,6 +200,14 @@ export function MurojaatStatBlok({ data, loading }) {
     if (rest > 0) top.push({ name: 'Boshqalar', value: rest })
     return top
   }, [data])
+  const kasbPie   = useMemo(() => {
+    const sorted = [...(data?.kasb_stat || [])].sort((a, b) => b.soni - a.soni)
+    const TOP_N = 6
+    const top = sorted.slice(0, TOP_N).map(k => ({ name: k.nomi, value: k.soni }))
+    const rest = sorted.slice(TOP_N).reduce((s, k) => s + k.soni, 0)
+    if (rest > 0) top.push({ name: 'Boshqalar', value: rest })
+    return top
+  }, [data])
   const jinsiPie  = useMemo(() => (data?.jinsi_stat || []).map(j => ({ name: j.jinsi, value: j.soni })), [data])
   const yoshBar   = useMemo(() => (data?.yosh_stat  || []).map(y => ({ name: y.guruh, soni: y.soni })),  [data])
   const viloyatBar = useMemo(
@@ -259,8 +267,8 @@ export function MurojaatStatBlok({ data, loading }) {
         </ResponsiveContainer>
       </ChartCard>
 
-      {/* Usul / Jinsi / Yosh kesimida */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      {/* Usul / Kasbi / Jinsi / Yosh kesimida */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <ChartCard title="🎭 Sodir etish usuli kesimida">
           <ResponsiveContainer width="100%" height={360}>
             <PieChart>
@@ -275,6 +283,29 @@ export function MurojaatStatBlok({ data, loading }) {
                 align="center"
                 formatter={(value, entry) => {
                   const total = usulPie.reduce((s, u) => s + u.value, 0)
+                  const pct = total ? ((entry.payload.value / total) * 100).toFixed(0) : 0
+                  const short = value.length > 28 ? value.slice(0, 28) + '…' : value
+                  return `${short} (${pct}%)`
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="💼 Kasbi kesimida">
+          <ResponsiveContainer width="100%" height={360}>
+            <PieChart>
+              <Pie data={kasbPie} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={80} labelLine={false}>
+                {kasbPie.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]}/>)}
+              </Pie>
+              <Tooltip formatter={(value, name) => [value, name]}/>
+              <Legend
+                wrapperStyle={{ fontSize: 10, lineHeight: '16px' }}
+                layout="vertical"
+                verticalAlign="bottom"
+                align="center"
+                formatter={(value, entry) => {
+                  const total = kasbPie.reduce((s, k) => s + k.value, 0)
                   const pct = total ? ((entry.payload.value / total) * 100).toFixed(0) : 0
                   const short = value.length > 28 ? value.slice(0, 28) + '…' : value
                   return `${short} (${pct}%)`
