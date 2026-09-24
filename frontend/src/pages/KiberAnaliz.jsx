@@ -169,8 +169,9 @@ export default function KiberAnaliz() {
   const [pulses, setPulses]     = useState([])
 
   const FEED_MAX = 7
-  const poolRef   = useRef([])
-  const idxRef    = useRef(0)
+  const spawnQueueRef = useRef([])   // faqat hali ko'rsatilmagan, chinakam yozuvlar navbati
+  const shownIdsRef   = useRef(new Set())
+  const sideRef       = useRef(0)
   const mapObjRef = useRef(null)
   const mapDivRef = useRef(null)
 
@@ -192,7 +193,12 @@ export default function KiberAnaliz() {
       ])
       setQamrov(qRes.data || [])
       setStat(sRes.data || null)
-      if ((fRes.data || []).length) poolRef.current = fRes.data
+      // Faqat chinakam yangi (hali ko'rsatilmagan va navbatda hali yo'q) yozuvlarni
+      // qo'shamiz — eski yozuvlarni qayta-qayta aylantirmaymiz, soxta "jonlilik"
+      // hissi bermaslik uchun (ko'rsatilgach id shownIdsRef ga qo'shiladi)
+      const queuedIds = new Set(spawnQueueRef.current.map(x => x.id))
+      const fresh = (fRes.data || []).filter(h => !shownIdsRef.current.has(h.id) && !queuedIds.has(h.id))
+      spawnQueueRef.current.push(...fresh)
     } catch (_) {}
   }, [today])
 
@@ -203,16 +209,16 @@ export default function KiberAnaliz() {
   }, [loadAll])
 
   /* Karta xaritadan "chiqib" chetga uchib boradi, so'ng doimiy ro'yxatga qo'shiladi
-     (yangisi tepada, eskisi pastga suriladi) */
+     (yangisi tepada, eskisi pastga suriladi). Faqat NAVBATDAGI (hali ko'rsatilmagan,
+     chinakam) yozuvlar chiqadi — yo'q bo'lsa hech narsa spawn qilinmaydi. */
   useEffect(() => {
     const spawn = () => {
-      const pool = poolRef.current
-      if (!pool.length) return
-      const idx = idxRef.current % pool.length
-      idxRef.current += 1
-      const base = pool[idx]
-      const uid = `${base.id}-${idxRef.current}`
-      const side = idxRef.current % 2 === 0 ? 'left' : 'right'
+      const base = spawnQueueRef.current.shift()
+      if (!base) return
+      shownIdsRef.current.add(base.id)
+      const uid = `${base.id}-${Date.now()}`
+      sideRef.current += 1
+      const side = sideRef.current % 2 === 0 ? 'left' : 'right'
 
       // Agar hisobotda GPS bo'lsa — aynan o'sha nuqtadan chiqqandek ko'rsatamiz
       let sx = null, sy = null
