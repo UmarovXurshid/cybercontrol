@@ -230,11 +230,12 @@ export default function KiberAnaliz() {
     const uzName = normGeo(feature?.properties?.shapeName || '')
     const v = coverageMap[uzName]
     const active = v && v.qamrangan > 0
+    // Fonga moslab — chegara chizig'i yo'q, faol hududlarda juda xira porlash
     return {
-      fillColor:   active ? NEON.cyan : NEON.dim,
-      fillOpacity: active ? 0.35 : 0.12,
-      color:       active ? NEON.cyan : '#2a4a63',
-      weight:      active ? 1.6 : 1,
+      fillColor:   active ? NEON.cyan : '#0a1c2e',
+      fillOpacity: active ? 0.16 : 0.3,
+      color:       active ? 'rgba(34,230,255,0.25)' : 'transparent',
+      weight:      active ? 0.6 : 0,
     }
   }, [coverageMap])
 
@@ -243,19 +244,30 @@ export default function KiberAnaliz() {
       mouseover(e) {
         const uz = normGeo(e.target.feature?.properties?.shapeName || '')
         const v = coverageMap[uz]
-        e.target.setStyle({ weight: 3.5, color: NEON.green, fillOpacity: 0.55 })
+        e.target.setStyle({ weight: 2, color: NEON.green, fillColor: NEON.green, fillOpacity: 0.5 })
         e.target.bringToFront()
         const el = e.target.getElement ? e.target.getElement() : e.target._path
-        if (el) el.style.filter = `drop-shadow(0 0 14px ${NEON.green})`
+        if (el) {
+          el.style.transformBox = 'fill-box'
+          el.style.transformOrigin = 'center'
+          el.style.transform = 'scale(1.045)'
+          el.style.filter = `drop-shadow(0 0 22px ${NEON.green}) brightness(1.25)`
+          el.style.transition = 'transform .18s ease, filter .18s ease'
+        }
         setHover(v ? v : { nomi: feature?.properties?.shapeName, jami: 0, qamrangan: 0, foiz: 0 })
       },
       mouseout(e) {
         const uz = normGeo(e.target.feature?.properties?.shapeName || '')
         const v = coverageMap[uz]
         const active = v && v.qamrangan > 0
-        e.target.setStyle({ weight: active ? 1.6 : 1, color: active ? NEON.cyan : '#2a4a63', fillOpacity: active ? 0.35 : 0.12 })
+        e.target.setStyle({
+          weight: active ? 0.6 : 0,
+          color: active ? 'rgba(34,230,255,0.25)' : 'transparent',
+          fillColor: active ? NEON.cyan : '#0a1c2e',
+          fillOpacity: active ? 0.16 : 0.3,
+        })
         const el = e.target.getElement ? e.target.getElement() : e.target._path
-        if (el) el.style.filter = ''
+        if (el) { el.style.transform = ''; el.style.filter = '' }
         setHover(null)
       },
     })
