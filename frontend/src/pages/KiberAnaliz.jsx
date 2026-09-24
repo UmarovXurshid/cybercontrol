@@ -1,0 +1,481 @@
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import api from '../api'
+import { localDateStr } from '../utils/date'
+
+/* ════════════════════════════════════════════════════════════════════════════
+   KIBER-TAHLIL — real vaqtda targ'ibot/murojaat monitoring ekrani
+   Mustaqil, to'liq ekranli sahifa — Layout/menyusiz. Boshqa sahifalarga
+   ta'sir qilmaydi, faqat mavjud (read-only) API'lardan foydalanadi.
+═══════════════════════════════════════════════════════════════════════════ */
+
+const GEO_URL = '/uz-viloyatlar.geojson'
+
+const SHAPE_MAP = {
+  'andijan region':              'andijon',
+  'bukhara region':              'buxoro',
+  'fergana region':              "farg'ona",
+  'jizzakh region':              'jizzax',
+  'namangan region':             'namangan',
+  'navoiy region':               'navoiy',
+  'qashqadaryo region':          'qashqadaryo',
+  'kashkadarya region':          'qashqadaryo',
+  'republic of karakalpakstan':  "qoraqalpog'iston",
+  'samarqand region':            'samarqand',
+  'tashkent region':             'toshkent viloyati',
+  'tashkent':                    'toshkent shahri',
+  'sirdaryo region':             'sirdaryo',
+  'surxondaryo region':          'surxondaryo',
+  'xorazm region':               'xorazm',
+}
+function normDB(s = '') {
+  return s.toLowerCase()
+    .replace(/\s*(viloyati?|viloayti?|shahri?|shahari?|respublikasi?)\s*/g, '')
+    .replace(/\s+/g, ' ').trim()
+}
+function normGeo(shapeName = '') {
+  const key = shapeName.toLowerCase().trim()
+  const mapped = SHAPE_MAP[key]
+  if (mapped) return mapped
+  return key.replace(/\bregion\b|\brepublic\b|\bof\b/g, '').trim().split(/\s+/)[0]
+}
+
+const NEON = { cyan: '#22e6ff', green: '#39ff8a', magenta: '#ff3ec8', amber: '#ffb020', dim: '#123049' }
+
+/* ── Soat ─────────────────────────────────────────────────────────────────── */
+function useClock() {
+  const [now, setNow] = useState(new Date())
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  return now
+}
+
+/* ── Sonni animatsiyali oshirib ko'rsatish ───────────────────────────────── */
+function CountUp({ value }) {
+  const [disp, setDisp] = useState(0)
+  const ref = useRef(0)
+  useEffect(() => {
+    const from = ref.current
+    const to = value || 0
+    const dur = 600
+    const t0 = performance.now()
+    let raf
+    const step = (t) => {
+      const p = Math.min(1, (t - t0) / dur)
+      setDisp(Math.round(from + (to - from) * p))
+      if (p < 1) raf = requestAnimationFrame(step)
+      else ref.current = to
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [value])
+  return <>{disp.toLocaleString()}</>
+}
+
+/* ── Xarita — FitBounds ───────────────────────────────────────────────────── */
+function FitBounds({ geoJson }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!geoJson) return
+    try {
+      const layer = L.geoJSON(geoJson)
+      map.fitBounds(layer.getBounds(), { padding: [10, 10] })
+    } catch (_) {}
+  }, [geoJson, map])
+  return null
+}
+
+/* ── Uchib keluvchi karta (jonli GPS nuqtasi + manzil) ───────────────────── */
+function FlyingCard({ item, side }) {
+  const online = item.targibot_turi === 2
+  return (
+    <div
+      className={`fly-card fly-${side}`}
+      style={{ '--edge': side === 'left' ? '-340px' : '340px' }}
+    >
+      <div className="fly-card-inner">
+        <div className={`fly-card-icon ${online ? 'blue' : 'green'}`}>{online ? '🌐' : '📢'}</div>
+        <div className="fly-card-txt">
+          <div className="fly-card-viloyat">{online ? 'Online targ\'ibot' : 'Offline targ\'ibot'}</div>
+          <div className="fly-card-tuman">{item.tuman_nomi} · {item.mahalla_nomi}</div>
+          <div className="fly-card-meta">👥 {item.qatnashchilar || 0} kishi</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   ASOSIY SAHIFA
+═══════════════════════════════════════════════════════════════════════════ */
+export default function KiberAnaliz() {
+  const now = useClock()
+  const today = localDateStr()
+
+  const [qamrov, setQamrov]     = useState([])
+  const [stat, setStat]         = useState(null)
+  const [geoJson, setGeoJson]   = useState(null)
+  const [hover, setHover]       = useState(null)
+  const [flying, setFlying]     = useState([])
+
+  const photoPoolRef = useRef([])
+  const flyIdxRef    = useRef(0)
+
+  const role = localStorage.getItem('role')
+  const backTo = role === 'respublika' ? '/respublika' : role === 'tuman' ? '/tuman' : '/'
+
+  /* GeoJSON — bir marta */
+  useEffect(() => {
+    fetch(GEO_URL).then(r => r.json()).then(setGeoJson).catch(() => {})
+  }, [])
+
+  /* Asosiy ma'lumotlar — yuklash + davriy yangilash (real vaqt hissi) */
+  const loadAll = useCallback(async () => {
+    try {
+      const [qRes, sRes, nRes] = await Promise.all([
+        api.get(`/qamrov/?start=${today}&end=${today}`),
+        api.get(`/murojaat/statistika/?start=${today}&end=${today}`),
+        api.get(`/qamrov/nuqtalar/?start=${today}&end=${today}`),
+      ])
+      setQamrov(qRes.data || [])
+      setStat(sRes.data || null)
+      const pool = (nRes.data || [])
+      if (pool.length) photoPoolRef.current = pool
+    } catch (_) {}
+  }, [today])
+
+  useEffect(() => {
+    loadAll()
+    const t = setInterval(loadAll, 45000)
+    return () => clearInterval(t)
+  }, [loadAll])
+
+  /* Uchib keluvchi kartalarni davriy chiqarish */
+  useEffect(() => {
+    const spawn = () => {
+      const pool = photoPoolRef.current
+      if (!pool.length) return
+      const idx = flyIdxRef.current % pool.length
+      flyIdxRef.current += 1
+      const base = pool[idx]
+      const side = flyIdxRef.current % 2 === 0 ? 'left' : 'right'
+      const uid = `${base.id}-${Date.now()}`
+      setFlying(f => [...f.slice(-3), { ...base, uid, side }])
+      setTimeout(() => setFlying(f => f.filter(x => x.uid !== uid)), 7000)
+    }
+    const t = setInterval(spawn, 4500)
+    const t0 = setTimeout(spawn, 1500)
+    return () => { clearInterval(t); clearTimeout(t0) }
+  }, [])
+
+  const coverageMap = useMemo(() => {
+    const m = {}
+    qamrov.forEach(v => { m[normDB(v.nomi)] = v })
+    return m
+  }, [qamrov])
+
+  const style = useCallback((feature) => {
+    const uzName = normGeo(feature?.properties?.shapeName || '')
+    const v = coverageMap[uzName]
+    const active = v && v.qamrangan > 0
+    return {
+      fillColor:   active ? NEON.cyan : NEON.dim,
+      fillOpacity: active ? 0.35 : 0.12,
+      color:       active ? NEON.cyan : '#2a4a63',
+      weight:      active ? 1.6 : 1,
+    }
+  }, [coverageMap])
+
+  const onEachFeature = useCallback((feature, layer) => {
+    layer.on({
+      mouseover(e) {
+        const uz = normGeo(e.target.feature?.properties?.shapeName || '')
+        const v = coverageMap[uz]
+        e.target.setStyle({ weight: 3.5, color: NEON.green, fillOpacity: 0.55 })
+        e.target.bringToFront()
+        const el = e.target.getElement ? e.target.getElement() : e.target._path
+        if (el) el.style.filter = `drop-shadow(0 0 14px ${NEON.green})`
+        setHover(v ? v : { nomi: feature?.properties?.shapeName, jami: 0, qamrangan: 0, foiz: 0 })
+      },
+      mouseout(e) {
+        const uz = normGeo(e.target.feature?.properties?.shapeName || '')
+        const v = coverageMap[uz]
+        const active = v && v.qamrangan > 0
+        e.target.setStyle({ weight: active ? 1.6 : 1, color: active ? NEON.cyan : '#2a4a63', fillOpacity: active ? 0.35 : 0.12 })
+        const el = e.target.getElement ? e.target.getElement() : e.target._path
+        if (el) el.style.filter = ''
+        setHover(null)
+      },
+    })
+  }, [coverageMap])
+
+  const jamiTargibot = qamrov.reduce((s, v) => s + (v.qamrangan || 0), 0)
+  const jamiMurojaat  = stat?.jami || 0
+
+  return (
+    <div className="kiber-root">
+      <style>{CSS}</style>
+
+      <a href={backTo} className="kiber-back">← Boshqaruv paneli</a>
+
+      <div className="kiber-scanline" />
+      <div className="kiber-grid" />
+
+      <header className="kiber-header">
+        <div className="kiber-title">
+          <span className="kiber-title-main">KIBERXAVFSIZLIK&nbsp;TAHLIL&nbsp;MARKAZI</span>
+          <span className="kiber-title-sub">Respublika bo'yicha real vaqt monitoringi</span>
+        </div>
+        <div className="kiber-clock">
+          {now.toLocaleTimeString('uz-UZ')}
+          <div className="kiber-date">{now.toLocaleDateString('uz-UZ', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+        </div>
+      </header>
+
+      <div className="kiber-kpis">
+        <div className="kiber-kpi">
+          <div className="kiber-kpi-val cyan"><CountUp value={jamiTargibot}/></div>
+          <div className="kiber-kpi-lbl">Bugungi targ'ibot</div>
+        </div>
+        <div className="kiber-kpi">
+          <div className="kiber-kpi-val magenta"><CountUp value={jamiMurojaat}/></div>
+          <div className="kiber-kpi-lbl">Bugungi murojaat</div>
+        </div>
+        <div className="kiber-kpi">
+          <div className="kiber-kpi-val green">{qamrov.length}</div>
+          <div className="kiber-kpi-lbl">Faol hudud</div>
+        </div>
+      </div>
+
+      {/* Chap panel — eng ko'p jabrlangan kasblar */}
+      <aside className="kiber-panel kiber-panel-left">
+        <div className="kiber-panel-title">⚠ Eng ko'p jabrlangan kasb toifalari</div>
+        {(stat?.kasb_stat || []).slice(0, 6).map((k, i) => {
+          const max = stat.kasb_stat[0]?.soni || 1
+          return (
+            <div key={k.nomi} className="kiber-bar-row">
+              <div className="kiber-bar-lbl">{k.nomi}</div>
+              <div className="kiber-bar-track">
+                <div className="kiber-bar-fill magenta" style={{ width: `${(k.soni / max) * 100}%`, animationDelay: `${i * 0.1}s` }} />
+              </div>
+              <div className="kiber-bar-val">{k.soni}</div>
+            </div>
+          )
+        })}
+        {!stat && <div className="kiber-loading">Yuklanmoqda…</div>}
+      </aside>
+
+      {/* O'ng panel — eng ko'p uchraydigan usul */}
+      <aside className="kiber-panel kiber-panel-right">
+        <div className="kiber-panel-title">☠ Eng ko'p qo'llanilgan firibgarlik usuli</div>
+        {(stat?.usul_stat || []).slice(0, 6).map((u, i) => {
+          const max = stat.usul_stat[0]?.soni || 1
+          return (
+            <div key={u.nomi} className="kiber-bar-row">
+              <div className="kiber-bar-lbl">{u.nomi}</div>
+              <div className="kiber-bar-track">
+                <div className="kiber-bar-fill amber" style={{ width: `${(u.soni / max) * 100}%`, animationDelay: `${i * 0.1}s` }} />
+              </div>
+              <div className="kiber-bar-val">{u.soni}</div>
+            </div>
+          )
+        })}
+        {!stat && <div className="kiber-loading">Yuklanmoqda…</div>}
+      </aside>
+
+      {/* Markaz — 3D holografik xarita */}
+      <div className="kiber-map-wrap">
+        <div className="kiber-map-tilt">
+          <div className="kiber-map-inner">
+            <MapContainer
+              center={[41.6, 64.0]}
+              zoom={6}
+              style={{ height: '100%', width: '100%', background: 'transparent' }}
+              zoomControl={false}
+              attributionControl={false}
+              scrollWheelZoom={true}
+              dragging={true}
+            >
+              <TileLayer
+                url="https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png"
+                subdomains="abcd"
+                maxZoom={19}
+              />
+              {geoJson && (
+                <GeoJSON key="kiber-geo" data={geoJson} style={style} onEachFeature={onEachFeature} />
+              )}
+              {geoJson && <FitBounds geoJson={geoJson} />}
+            </MapContainer>
+          </div>
+        </div>
+
+        {hover && (
+          <div className="kiber-hover-card">
+            <div className="kiber-hover-nomi">{hover.nomi}</div>
+            <div className="kiber-hover-row"><span>Qamrangan mahalla</span><b>{hover.qamrangan ?? 0}/{hover.jami ?? 0}</b></div>
+            <div className="kiber-hover-row"><span>Qamrov darajasi</span><b>{hover.foiz ?? 0}%</b></div>
+          </div>
+        )}
+      </div>
+
+      {/* Uchib o'tuvchi isbot rasmlari */}
+      <div className="kiber-fly-zone">
+        {flying.map(f => <FlyingCard key={f.uid} item={f} side={f.side} />)}
+      </div>
+
+      <footer className="kiber-footer">
+        Manba: CyberControl — Respublika markazlashtirilgan tizimi · Har 45 soniyada yangilanadi
+      </footer>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   USLUB (faqat shu sahifaga tegishli, global CSS ga ta'sir qilmaydi)
+═══════════════════════════════════════════════════════════════════════════ */
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap');
+
+.kiber-root {
+  position: fixed; inset: 0; z-index: 9999;
+  background: radial-gradient(ellipse at 50% 20%, #071b2c 0%, #010509 70%);
+  overflow: hidden;
+  font-family: 'Share Tech Mono', monospace;
+  color: #cdeaff;
+}
+.kiber-grid {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0.25;
+  background-image:
+    linear-gradient(rgba(34,230,255,0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34,230,255,0.12) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: radial-gradient(ellipse at 50% 40%, black 0%, transparent 75%);
+}
+.kiber-scanline {
+  position: absolute; left: 0; right: 0; height: 2px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(57,255,138,0.55), transparent);
+  animation: kiber-scan 5s linear infinite;
+  z-index: 2;
+}
+@keyframes kiber-scan { 0% { top: -2%; } 100% { top: 102%; } }
+
+.kiber-back {
+  position: absolute; top: 18px; left: 18px; z-index: 20;
+  color: #7fd8ff; text-decoration: none; font-size: 12px; letter-spacing: 0.05em;
+  border: 1px solid rgba(34,230,255,0.4); padding: 6px 12px; border-radius: 6px;
+  background: rgba(2,20,32,0.6); backdrop-filter: blur(4px);
+  transition: all .15s;
+}
+.kiber-back:hover { background: rgba(34,230,255,0.15); border-color: #22e6ff; }
+
+.kiber-header {
+  position: relative; z-index: 5; display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 22px 32px 0 32px;
+}
+.kiber-title-main {
+  font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 22px; letter-spacing: 0.12em;
+  background: linear-gradient(90deg, #22e6ff, #39ff8a);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  display: block; text-shadow: 0 0 24px rgba(34,230,255,0.35);
+}
+.kiber-title-sub { display: block; font-size: 11px; color: #6fa8c9; letter-spacing: 0.08em; margin-top: 4px; }
+.kiber-clock { text-align: right; font-family: 'Orbitron', sans-serif; font-size: 24px; color: #39ff8a; text-shadow: 0 0 12px rgba(57,255,138,0.5); }
+.kiber-date { font-size: 11px; color: #6fa8c9; font-family: 'Share Tech Mono', monospace; margin-top: 2px; }
+
+.kiber-kpis {
+  position: relative; z-index: 5; display: flex; gap: 28px; justify-content: center;
+  margin-top: 10px;
+}
+.kiber-kpi { text-align: center; }
+.kiber-kpi-val { font-family: 'Orbitron', sans-serif; font-size: 30px; font-weight: 700; }
+.kiber-kpi-val.cyan { color: #22e6ff; text-shadow: 0 0 16px rgba(34,230,255,0.55); }
+.kiber-kpi-val.magenta { color: #ff3ec8; text-shadow: 0 0 16px rgba(255,62,200,0.55); }
+.kiber-kpi-val.green { color: #39ff8a; text-shadow: 0 0 16px rgba(57,255,138,0.55); }
+.kiber-kpi-lbl { font-size: 10.5px; color: #6fa8c9; letter-spacing: 0.06em; margin-top: 2px; }
+
+.kiber-panel {
+  position: absolute; top: 150px; bottom: 60px; width: 300px; z-index: 6;
+  background: linear-gradient(180deg, rgba(4,22,36,0.75), rgba(4,22,36,0.35));
+  border: 1px solid rgba(34,230,255,0.22); border-radius: 10px; padding: 14px 16px;
+  backdrop-filter: blur(3px); overflow: hidden;
+}
+.kiber-panel-left { left: 22px; }
+.kiber-panel-right { right: 22px; }
+.kiber-panel-title { font-size: 11.5px; color: #7fd8ff; letter-spacing: 0.04em; margin-bottom: 14px; line-height: 1.4; }
+.kiber-bar-row { margin-bottom: 12px; }
+.kiber-bar-lbl { font-size: 10.5px; color: #cdeaff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+.kiber-bar-track { height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+.kiber-bar-fill { height: 100%; border-radius: 3px; animation: kiber-fill 1s ease-out both; }
+.kiber-bar-fill.magenta { background: linear-gradient(90deg, #ff3ec8, #ff8fd8); box-shadow: 0 0 8px rgba(255,62,200,0.6); }
+.kiber-bar-fill.amber   { background: linear-gradient(90deg, #ffb020, #ffe08a); box-shadow: 0 0 8px rgba(255,176,32,0.6); }
+@keyframes kiber-fill { from { width: 0 !important; } }
+.kiber-bar-val { font-size: 10px; color: #6fa8c9; margin-top: 2px; text-align: right; }
+.kiber-loading { font-size: 11px; color: #6fa8c9; }
+
+.kiber-map-wrap {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding-top: 60px;
+}
+.kiber-map-tilt { perspective: 1400px; width: min(760px, 62vw); height: min(560px, 68vh); }
+.kiber-map-inner {
+  width: 100%; height: 100%; border-radius: 16px; overflow: hidden;
+  transform: rotateX(18deg) scale(0.98);
+  transform-style: preserve-3d;
+  box-shadow: 0 40px 90px rgba(0,0,0,0.65), 0 0 60px rgba(34,230,255,0.12), inset 0 0 0 1px rgba(34,230,255,0.25);
+  transition: transform .4s ease;
+}
+.kiber-map-tilt:hover .kiber-map-inner { transform: rotateX(9deg) scale(1); }
+
+.kiber-hover-card {
+  position: absolute; top: 68px; left: 50%; transform: translateX(-50%); z-index: 8;
+  background: rgba(4,22,36,0.9); border: 1px solid #39ff8a; border-radius: 10px;
+  padding: 10px 18px; text-align: center; box-shadow: 0 0 24px rgba(57,255,138,0.35);
+}
+.kiber-hover-nomi { font-family: 'Orbitron', sans-serif; font-size: 13px; color: #39ff8a; margin-bottom: 4px; }
+.kiber-hover-row { font-size: 11px; color: #cdeaff; display: flex; gap: 10px; justify-content: space-between; }
+.kiber-hover-row b { color: #22e6ff; }
+
+.kiber-fly-zone { position: absolute; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
+.fly-card { position: absolute; top: 22%; animation: fly-move 7s linear forwards; }
+.fly-left  { left: var(--edge); animation-name: fly-in-left; }
+.fly-right { right: var(--edge); animation-name: fly-in-right; }
+@keyframes fly-in-left {
+  0%   { transform: translateX(0) translateY(0); opacity: 0; }
+  8%   { opacity: 1; }
+  45%  { transform: translateX(420px) translateY(40vh); opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translateX(460px) translateY(55vh); opacity: 0; }
+}
+@keyframes fly-in-right {
+  0%   { transform: translateX(0) translateY(0); opacity: 0; }
+  8%   { opacity: 1; }
+  45%  { transform: translateX(-420px) translateY(45vh); opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translateX(-460px) translateY(60vh); opacity: 0; }
+}
+.fly-card-inner {
+  width: 168px; background: rgba(4,22,36,0.92); border: 1px solid rgba(34,230,255,0.4);
+  border-radius: 10px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 18px rgba(34,230,255,0.25);
+}
+.fly-card-icon { width: 100%; height: 64px; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+.fly-card-icon.green { background: radial-gradient(circle, rgba(57,255,138,0.25), rgba(57,255,138,0.04)); }
+.fly-card-icon.blue  { background: radial-gradient(circle, rgba(34,230,255,0.25), rgba(34,230,255,0.04)); }
+.fly-card-txt { padding: 7px 9px; }
+.fly-card-viloyat { font-size: 10.5px; color: #39ff8a; font-weight: bold; letter-spacing: 0.02em; }
+.fly-card-tuman { font-size: 9.5px; color: #9fc9e0; margin-top: 2px; line-height: 1.3; }
+.fly-card-meta { font-size: 9px; color: #6fa8c9; margin-top: 3px; }
+
+.kiber-footer {
+  position: absolute; bottom: 14px; left: 0; right: 0; text-align: center;
+  font-size: 10px; color: #3f6d87; letter-spacing: 0.05em; z-index: 5;
+}
+
+@media (max-width: 900px) {
+  .kiber-panel { display: none; }
+  .kiber-map-tilt { width: 90vw; height: 50vh; }
+}
+`

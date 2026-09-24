@@ -38,6 +38,7 @@ import RespublikaDashboard from './pages/RespublikaDashboard'
 import RespublikaHisobot from './pages/RespublikaHisobot'
 import Viloyatlar from './pages/Viloyatlar'
 import Foydalanuvchilar from './pages/Foydalanuvchilar'
+import KiberAnaliz from './pages/KiberAnaliz'
 
 /* ── Route guardlar ─────────────────────────────────────────────────────── */
 const PrivateRoute = ({ children }) => {
@@ -63,6 +64,12 @@ const TumanRoute = ({ children }) => {
   const role  = localStorage.getItem('role')
   if (!token) return <Navigate to="/login" replace/>
   if (role !== 'tuman') return <Navigate to="/" replace/>
+  return children
+}
+
+const AuthRoute = ({ children }) => {
+  const token = localStorage.getItem('token')
+  if (!token) return <Navigate to="/login" replace/>
   return children
 }
 
@@ -139,6 +146,9 @@ export default function App() {
           <Route path="kunlik-malumotnoma"                   element={<KunlikMalumotnoma/>}/>
           <Route path="qamrov"                               element={<Qamrov/>}/>
         </Route>
+
+        {/* ── Kiber-tahlil — mustaqil, to'liq ekranli, menyusiz sahifa ──── */}
+        <Route path="/kiber-analiz" element={<AuthRoute><KiberAnaliz/></AuthRoute>}/>
 
         <Route path="*" element={<Navigate to="/login" replace/>}/>
       </Routes>
