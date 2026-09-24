@@ -76,6 +76,25 @@ function CountUp({ value }) {
   return <>{disp.toLocaleString()}</>
 }
 
+/* ── Yarim-doira gauge (xavf darajasi) ───────────────────────────────────── */
+function Gauge({ pct, color, label, sub }) {
+  const R = 54, C = Math.PI * R
+  const offset = C - (Math.min(100, Math.max(0, pct)) / 100) * C
+  return (
+    <div className="gauge">
+      <svg viewBox="0 0 130 72" width="150" height="84">
+        <path d="M 10 65 A 54 54 0 0 1 120 65" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="9" strokeLinecap="round"/>
+        <path d="M 10 65 A 54 54 0 0 1 120 65" fill="none" stroke={color} strokeWidth="9" strokeLinecap="round"
+          strokeDasharray={C} strokeDashoffset={offset}
+          style={{ filter: `drop-shadow(0 0 6px ${color})`, transition: 'stroke-dashoffset .8s ease, stroke .4s' }}/>
+      </svg>
+      <div className="gauge-val" style={{ color }}>{pct}%</div>
+      <div className="gauge-lbl">{label}</div>
+      <div className="gauge-sub" style={{ color }}>{sub}</div>
+    </div>
+  )
+}
+
 /* ── Xarita — FitBounds ───────────────────────────────────────────────────── */
 function FitBounds({ geoJson }) {
   const map = useMap()
@@ -226,18 +245,21 @@ export default function KiberAnaliz() {
     return m
   }, [qamrov])
 
+  const maxQamrangan = useMemo(() => Math.max(1, ...qamrov.map(v => v.qamrangan || 0)), [qamrov])
+
   const style = useCallback((feature) => {
     const uzName = normGeo(feature?.properties?.shapeName || '')
     const v = coverageMap[uzName]
     const active = v && v.qamrangan > 0
-    // Fonga moslab — chegara chizig'i yo'q, faol hududlarda juda xira porlash
+    // Faollik darajasiga qarab yorqinlik — qanchalik faol, shunchalik ochiq porlaydi
+    const intensity = active ? 0.35 + 0.55 * (v.qamrangan / maxQamrangan) : 0
     return {
-      fillColor:   active ? NEON.cyan : '#0a1c2e',
-      fillOpacity: active ? 0.16 : 0.3,
-      color:       active ? 'rgba(34,230,255,0.25)' : 'transparent',
-      weight:      active ? 0.6 : 0,
+      fillColor:   active ? NEON.cyan : '#132a42',
+      fillOpacity: active ? intensity : 0.42,
+      color:       active ? 'rgba(34,230,255,0.5)' : 'transparent',
+      weight:      active ? 1 : 0,
     }
-  }, [coverageMap])
+  }, [coverageMap, maxQamrangan])
 
   const onEachFeature = useCallback((feature, layer) => {
     layer.on({
@@ -260,21 +282,34 @@ export default function KiberAnaliz() {
         const uz = normGeo(e.target.feature?.properties?.shapeName || '')
         const v = coverageMap[uz]
         const active = v && v.qamrangan > 0
+        const intensity = active ? 0.35 + 0.55 * (v.qamrangan / maxQamrangan) : 0
         e.target.setStyle({
-          weight: active ? 0.6 : 0,
-          color: active ? 'rgba(34,230,255,0.25)' : 'transparent',
-          fillColor: active ? NEON.cyan : '#0a1c2e',
-          fillOpacity: active ? 0.16 : 0.3,
+          weight: active ? 1 : 0,
+          color: active ? 'rgba(34,230,255,0.5)' : 'transparent',
+          fillColor: active ? NEON.cyan : '#132a42',
+          fillOpacity: active ? intensity : 0.42,
         })
         const el = e.target.getElement ? e.target.getElement() : e.target._path
         if (el) { el.style.transform = ''; el.style.filter = '' }
         setHover(null)
       },
     })
-  }, [coverageMap])
+  }, [coverageMap, maxQamrangan])
 
   const jamiTargibot = qamrov.reduce((s, v) => s + (v.qamrangan || 0), 0)
   const jamiMurojaat  = stat?.jami || 0
+  const topViloyat = useMemo(() => {
+    if (!qamrov.length) return null
+    return [...qamrov].sort((a, b) => (b.qamrangan || 0) - (a.qamrangan || 0))[0]
+  }, [qamrov])
+  // Xavf darajasi — bugungi murojaatning targ'ibotga nisbati (qanchalik yuqori, shunchalik xavfli)
+  const xavfPct = useMemo(() => {
+    if (!jamiTargibot) return jamiMurojaat > 0 ? 100 : 0
+    const ratio = (jamiMurojaat / jamiTargibot) * 100
+    return Math.max(0, Math.min(100, Math.round(ratio)))
+  }, [jamiMurojaat, jamiTargibot])
+  const xavfLabel = xavfPct >= 66 ? "YUQORI" : xavfPct >= 33 ? "O'RTACHA" : 'PAST'
+  const xavfColor = xavfPct >= 66 ? '#ff3ec8' : xavfPct >= 33 ? '#ffb020' : '#39ff8a'
 
   return (
     <div className="kiber-root">
@@ -309,6 +344,16 @@ export default function KiberAnaliz() {
           <div className="kiber-kpi-val green">{qamrov.length}</div>
           <div className="kiber-kpi-lbl">Faol hudud</div>
         </div>
+        {topViloyat && (
+          <div className="kiber-kpi">
+            <div className="kiber-kpi-val amber kiber-kpi-top">🏆 {topViloyat.nomi}</div>
+            <div className="kiber-kpi-lbl">Eng faol hudud · {topViloyat.qamrangan} ta</div>
+          </div>
+        )}
+      </div>
+
+      <div className="kiber-gauge-corner">
+        <Gauge pct={xavfPct} color={xavfColor} label="Xavf darajasi" sub={xavfLabel}/>
       </div>
 
       {/* Chap panel — eng ko'p jabrlangan kasblar */}
@@ -389,6 +434,23 @@ export default function KiberAnaliz() {
         {feedR.map(f => <FeedCard key={f.uid} item={f}/>)}
       </div>
 
+      {/* Jonli yangiliklar tasmasi (silliq aylanish uchun ikki marta takrorlanadi) */}
+      <div className="kiber-ticker">
+        <div className="kiber-ticker-track">
+          {(() => {
+            const items = [...feedR, ...feedL].slice(0, 10)
+            const render = (suffix) => items.length
+              ? items.map((f, i) => (
+                  <span key={f.uid + suffix + i} className="kiber-ticker-item">
+                    <b>●</b> {f.vaqt} — {f.viloyat_nomi}, {f.tuman_nomi} · {f.mahalla_nomi} · {f.targibot_turi === 2 ? 'online' : 'offline'} targ'ibot, {f.qatnashchilar || 0} ishtirokchi
+                  </span>
+                ))
+              : <span key={`empty${suffix}`} className="kiber-ticker-item">Real vaqtli hodisalar kutilmoqda…</span>
+            return <>{render('a')}{render('b')}</>
+          })()}
+        </div>
+      </div>
+
       <footer className="kiber-footer">
         Manba: CyberControl — Respublika markazlashtirilgan tizimi · Har 45 soniyada yangilanadi
       </footer>
@@ -458,6 +520,30 @@ const CSS = `
 .kiber-kpi-val.magenta { color: #ff3ec8; text-shadow: 0 0 16px rgba(255,62,200,0.55); }
 .kiber-kpi-val.green { color: #39ff8a; text-shadow: 0 0 16px rgba(57,255,138,0.55); }
 .kiber-kpi-lbl { font-size: 10.5px; color: #6fa8c9; letter-spacing: 0.06em; margin-top: 2px; }
+.kiber-kpi-val.amber { color: #ffb020; text-shadow: 0 0 16px rgba(255,176,32,0.55); }
+.kiber-kpi-top { font-size: 17px; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: kiber-pulse-slow 2.4s ease-in-out infinite; }
+@keyframes kiber-pulse-slow { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+.kiber-gauge-corner { position: absolute; top: 92px; right: 24px; z-index: 5; }
+.gauge { text-align: center; }
+.gauge-val { font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: 700; margin-top: -34px; }
+.gauge-lbl { font-size: 9px; color: #6fa8c9; letter-spacing: 0.06em; margin-top: 2px; }
+.gauge-sub { font-size: 10px; font-weight: bold; letter-spacing: 0.08em; }
+
+.kiber-ticker {
+  position: absolute; bottom: 34px; left: 0; right: 0; z-index: 5;
+  height: 24px; overflow: hidden;
+  background: linear-gradient(90deg, rgba(4,22,36,0.7), rgba(4,22,36,0.3), rgba(4,22,36,0.7));
+  border-top: 1px solid rgba(34,230,255,0.15); border-bottom: 1px solid rgba(34,230,255,0.15);
+}
+.kiber-ticker-track {
+  display: flex; gap: 60px; white-space: nowrap; width: max-content;
+  animation: kiber-ticker-scroll 35s linear infinite;
+  padding-top: 4px;
+}
+.kiber-ticker-item { font-size: 11px; color: #9fc9e0; letter-spacing: 0.02em; }
+.kiber-ticker-item b { color: #39ff8a; margin-right: 4px; }
+@keyframes kiber-ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
 .kiber-panel {
   position: absolute; top: 150px; bottom: 60px; width: 300px; z-index: 6;
