@@ -287,7 +287,7 @@ export function MurojaatStatBlok({ data, loading }) {
           tuman, tuman tanlansa mahalla kesimida chuqurlashadi */}
       <ChartCard title={hududTitle}>
         <div ref={hududBoxRef} style={{ overflowX: 'auto' }}>
-          <BarChart width={Math.max(hududBoxWidth || 700, hududBar.length * 34)} height={560}
+          <BarChart width={Math.max(hududBoxWidth || 700, hududBar.length * 34)} height={780}
             data={hududBar} margin={{ top: 20, right: 20, left: -10, bottom: 170 }}>
             <CartesianGrid strokeDasharray="3 3"/>
             <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-90} textAnchor="end" height={170}/>
