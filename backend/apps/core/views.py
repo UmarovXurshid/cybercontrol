@@ -3413,6 +3413,41 @@ def murojaat_statistika(request):
             'tumanlar': tumanlar,
         })
 
+    # ── Hudud kesimida — filtrga (yoki foydalanuvchi roliga) qarab moslashadi:
+    # hech narsa tanlanmagan -> viloyat kesimida, viloyat tanlangan -> tuman
+    # kesimida, tuman tanlangan -> mahalla kesimida ────────────────────────────
+    role = request.user.role
+    effective_viloyat = viloyat or (str(request.user.viloyat_id) if role in ('viloyat', 'tuman') and request.user.viloyat_id else None)
+    effective_tuman = tuman or (str(request.user.tuman_id) if role == 'tuman' and request.user.tuman_id else None)
+
+    if effective_tuman:
+        mahalla_rows = (
+            qs.exclude(mahalla_id__isnull=True)
+              .values('mahalla_id', 'mahalla__mahalla_nomi')
+              .annotate(soni=Count('id'), zarar_jami=Sum('zarar'))
+              .order_by('-soni')
+        )
+        hudud_stat = [
+            {'id': r['mahalla_id'], 'nomi': r['mahalla__mahalla_nomi'],
+             'soni': r['soni'], 'zarar_jami': float(r['zarar_jami'] or 0)}
+            for r in mahalla_rows
+        ]
+        hudud_daraja = 'mahalla'
+    elif effective_viloyat:
+        hudud_stat = [
+            {'id': t['tuman_id'], 'nomi': t['tuman__tuman_nomi'],
+             'soni': t['soni'], 'zarar_jami': float(t['zarar_jami'] or 0)}
+            for t in tuman_rows
+        ]
+        hudud_daraja = 'tuman'
+    else:
+        hudud_stat = [
+            {'id': v['viloyat_id'], 'nomi': v['viloyat__nomi'],
+             'soni': v['soni'], 'zarar_jami': float(v['zarar_jami'] or 0)}
+            for v in viloyat_rows
+        ]
+        hudud_daraja = 'viloyat'
+
     # ── Usul kesimida (asosiy (ota) kategoriyaga yig'ib) ──────────────────────
     usul_map = {u.id: u for u in MurojaatUsul.objects.all()}
     def root_usul_nomi(uid):
@@ -3478,13 +3513,15 @@ def murojaat_statistika(request):
         yosh_stat.append({'guruh': "Noma'lum", 'soni': noma_yosh})
 
     return Response({
-        'viloyatlar': viloyatlar,
-        'usul_stat':  usul_stat,
-        'kasb_stat':  kasb_stat,
-        'jinsi_stat': jinsi_stat,
-        'yosh_stat':  yosh_stat,
-        'jami':       qs.count(),
-        'jami_zarar': float(qs.aggregate(j=Sum('zarar'))['j'] or 0),
+        'viloyatlar':   viloyatlar,
+        'hudud_stat':   hudud_stat,
+        'hudud_daraja': hudud_daraja,
+        'usul_stat':    usul_stat,
+        'kasb_stat':    kasb_stat,
+        'jinsi_stat':   jinsi_stat,
+        'yosh_stat':    yosh_stat,
+        'jami':         qs.count(),
+        'jami_zarar':   float(qs.aggregate(j=Sum('zarar'))['j'] or 0),
     })
 
 

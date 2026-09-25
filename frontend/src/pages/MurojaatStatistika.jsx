@@ -210,12 +210,18 @@ export function MurojaatStatBlok({ data, loading }) {
   }, [data])
   const jinsiPie  = useMemo(() => (data?.jinsi_stat || []).map(j => ({ name: j.jinsi, value: j.soni })), [data])
   const yoshBar   = useMemo(() => (data?.yosh_stat  || []).map(y => ({ name: y.guruh, soni: y.soni })),  [data])
-  const viloyatBar = useMemo(
-    () => [...(data?.viloyatlar || [])]
+  const hududDaraja = data?.hudud_daraja || 'viloyat'
+  const hududBar = useMemo(
+    () => [...(data?.hudud_stat || [])]
       .sort((a, b) => b.soni - a.soni)
-      .map(v => ({ name: v.nomi.replace(/ viloyati$/i, '').replace(/ shahri$/i, ''), soni: v.soni, zarar: v.zarar_jami })),
+      .map(v => ({ name: (v.nomi || "Noma'lum").replace(/ viloyati$/i, '').replace(/ shahri$/i, ''), soni: v.soni, zarar: v.zarar_jami })),
     [data]
   )
+  const hududTitle = {
+    viloyat: "🏛️ Viloyatlar kesimida (murojaatlar soni)",
+    tuman:   "🏛️ Tumanlar kesimida (murojaatlar soni)",
+    mahalla: "🏛️ Mahallalar kesimida (murojaatlar soni)",
+  }[hududDaraja]
 
   if (loading) {
     return (
@@ -254,10 +260,11 @@ export function MurojaatStatBlok({ data, loading }) {
         <XaritaBlok viloyatlar={data.viloyatlar}/>
       </div>
 
-      {/* Viloyatlar kesimida — ustunli diagramma (reyting, tartiblangan) */}
-      <ChartCard title="🏛️ Viloyatlar kesimida (murojaatlar soni)">
+      {/* Hudud kesimida — ustunli diagramma (reyting, tartiblangan; filtrga qarab
+          viloyat tanlansa tuman, tuman tanlansa mahalla kesimida chuqurlashadi) */}
+      <ChartCard title={hududTitle}>
         <ResponsiveContainer width="100%" height={360}>
-          <BarChart data={viloyatBar} margin={{ top: 5, right: 20, left: -10, bottom: 60 }}>
+          <BarChart data={hududBar} margin={{ top: 5, right: 20, left: -10, bottom: 60 }}>
             <CartesianGrid strokeDasharray="3 3"/>
             <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-45} textAnchor="end" height={80}/>
             <YAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }}/>
