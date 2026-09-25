@@ -290,11 +290,11 @@ export function MurojaatStatBlok({ data, loading }) {
           <BarChart width={Math.max(hududBoxWidth || 700, hududBar.length * 34)} height={780}
             data={hududBar} margin={{ top: 20, right: 20, left: -10, bottom: 170 }}>
             <CartesianGrid strokeDasharray="3 3"/>
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-90} textAnchor="end" height={170}/>
-            <YAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }}/>
+            <XAxis dataKey="name" tick={{ fontSize: 13, fontWeight: 700 }} interval={0} angle={-90} textAnchor="end" height={170}/>
+            <YAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }}/>
             <Tooltip formatter={(value, name) => name === 'zarar' ? [`${value.toLocaleString()} so'm`, 'Jami zarar'] : [value, 'Murojaatlar soni']}/>
             <Bar dataKey="soni" fill="#4f46e5" radius={[4, 4, 0, 0]}>
-              <LabelList dataKey="soni" position="top" style={{ fontSize: 11, fill: '#374151' }}/>
+              <LabelList dataKey="soni" position="top" style={{ fontSize: 12, fontWeight: 700, fill: '#374151' }}/>
             </Bar>
           </BarChart>
         </div>
