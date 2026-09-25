@@ -191,20 +191,23 @@ export function ChartCard({ title, children }) {
   )
 }
 
-/* Konteyner kengligini kuzatib boradi — diagramma shunga moslashadi */
+/* Konteyner kengligini kuzatib boradi — diagramma shunga moslashadi.
+   Callback-ref ishlatiladi, chunki bu div boshida (loading holatida)
+   hali DOM'da bolmaydi — oddiy useRef+useEffect(deps:[]) uni hech qachon
+   topa olmas edi (effekt faqat bir marta, mount paytida ishga tushadi). */
 function useContainerWidth() {
-  const ref = useRef(null)
   const [width, setWidth] = useState(0)
+  const [node, setNode] = useState(null)
+  const ref = useCallback(el => setNode(el), [])
   useEffect(() => {
-    if (!ref.current) return
-    const el = ref.current
+    if (!node) return
     const ro = new ResizeObserver(entries => {
       if (entries[0]) setWidth(entries[0].contentRect.width)
     })
-    ro.observe(el)
-    setWidth(el.getBoundingClientRect().width)
+    ro.observe(node)
+    setWidth(node.getBoundingClientRect().width)
     return () => ro.disconnect()
-  }, [])
+  }, [node])
   return [ref, width]
 }
 
