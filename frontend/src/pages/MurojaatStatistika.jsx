@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -191,7 +191,25 @@ export function ChartCard({ title, children }) {
   )
 }
 
+/* Konteyner kengligini kuzatib boradi — diagramma shunga moslashadi */
+function useContainerWidth() {
+  const ref = useRef(null)
+  const [width, setWidth] = useState(0)
+  useEffect(() => {
+    if (!ref.current) return
+    const el = ref.current
+    const ro = new ResizeObserver(entries => {
+      if (entries[0]) setWidth(entries[0].contentRect.width)
+    })
+    ro.observe(el)
+    setWidth(el.getBoundingClientRect().width)
+    return () => ro.disconnect()
+  }, [])
+  return [ref, width]
+}
+
 export function MurojaatStatBlok({ data, loading }) {
+  const [hududBoxRef, hududBoxWidth] = useContainerWidth()
   const usulPie   = useMemo(() => {
     const sorted = [...(data?.usul_stat || [])].sort((a, b) => b.soni - a.soni)
     const TOP_N = 6
@@ -265,8 +283,8 @@ export function MurojaatStatBlok({ data, loading }) {
           gorizontal aylantirib korish mumkin. Filtrga qarab viloyat tanlansa
           tuman, tuman tanlansa mahalla kesimida chuqurlashadi */}
       <ChartCard title={hududTitle}>
-        <div style={{ overflowX: 'auto' }}>
-          <BarChart width={Math.max(700, hududBar.length * 34)} height={420}
+        <div ref={hududBoxRef} style={{ overflowX: 'auto' }}>
+          <BarChart width={Math.max(hududBoxWidth || 700, hududBar.length * 34)} height={420}
             data={hududBar} margin={{ top: 20, right: 20, left: -10, bottom: 140 }}>
             <CartesianGrid strokeDasharray="3 3"/>
             <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-90} textAnchor="end" height={140}/>
