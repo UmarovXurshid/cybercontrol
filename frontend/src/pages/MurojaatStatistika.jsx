@@ -260,17 +260,19 @@ export function MurojaatStatBlok({ data, loading }) {
         <XaritaBlok viloyatlar={data.viloyatlar}/>
       </div>
 
-      {/* Hudud kesimida — ustunli diagramma (reyting, tartiblangan; filtrga qarab
-          viloyat tanlansa tuman, tuman tanlansa mahalla kesimida chuqurlashadi) */}
+      {/* Hudud kesimida — gorizontal (yon) ustunli diagramma (nomlar tik ro'yxatda,
+          band soni ko'p bo'lsa ham hammasi o'qiladigan bo'lib qoladi). Filtrga qarab
+          viloyat tanlansa tuman, tuman tanlansa mahalla kesimida chuqurlashadi */}
       <ChartCard title={hududTitle}>
-        <ResponsiveContainer width="100%" height={360}>
-          <BarChart data={hududBar} margin={{ top: 5, right: 20, left: -10, bottom: 60 }}>
+        <ResponsiveContainer width="100%" height={Math.max(360, hududBar.length * 24)}>
+          <BarChart data={hududBar} layout="vertical" margin={{ top: 5, right: 40, left: 10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3"/>
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-45} textAnchor="end" height={80}/>
-            <YAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }}/>
+            <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }}/>
+            <YAxis type="category" dataKey="name" width={190} tick={{ fontSize: 11 }}
+              tickFormatter={v => v.length > 28 ? v.slice(0, 28) + '…' : v}/>
             <Tooltip formatter={(value, name) => name === 'zarar' ? [`${value.toLocaleString()} so'm`, 'Jami zarar'] : [value, 'Murojaatlar soni']}/>
-            <Bar dataKey="soni" fill="#4f46e5" radius={[4, 4, 0, 0]}>
-              <LabelList dataKey="soni" position="top" style={{ fontSize: 11, fill: '#374151' }}/>
+            <Bar dataKey="soni" fill="#4f46e5" radius={[0, 4, 4, 0]}>
+              <LabelList dataKey="soni" position="right" style={{ fontSize: 11, fill: '#374151' }}/>
             </Bar>
           </BarChart>
         </ResponsiveContainer>
